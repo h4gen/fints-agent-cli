@@ -217,13 +217,24 @@ def test_print_transactions_tsv(capsys):
             "date": "2026-02-16",
             "amount": "-3.43 EUR",
             "counterparty": "EDEKA",
+            "counterparty_iban": "DE02100100109307118603",
             "purpose": "VISA Debitkartenumsatz",
         }
     ]
     fac.print_transactions(rows, "tsv", 120)
     out = capsys.readouterr().out
-    assert "date\tamount\tcounterparty\tpurpose" in out
+    assert "date\tamount\tcounterparty\tcounterparty_iban\tpurpose" in out
     assert "2026-02-16" in out
+    assert "DE02100100109307118603" in out
+
+
+def test_extract_counterparty_iban_prefers_recipient():
+    data = {
+        "recipient_iban": "DE02 1001 0010 9307 1186 03",
+        "applicant_iban": "DE75512108001245126199",
+    }
+    iban = fac.extract_counterparty_iban(data, "")
+    assert iban == "DE02100100109307118603"
 
 
 def test_cmd_transfer_dry_run_no_submit(monkeypatch, capsys):

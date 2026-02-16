@@ -477,23 +477,75 @@ def validate_bic(value: str) -> bool:
     return bool(re.match(r"^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$", bic))
 
 
+def _normalize_iban_candidate(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        value = " ".join(str(x) for x in value if x is not None)
+    text = str(value).strip().upper()
+    if not text:
+        return ""
+    compact = normalize_iban(text)
+    if validate_iban(compact):
+        return compact
+    return ""
+
+
+def extract_counterparty_iban(data: dict, purpose: str = "") -> str:
+    if not isinstance(data, dict):
+        data = {}
+    direct_keys = [
+        "recipient_iban",
+        "applicant_iban",
+        "counterparty_iban",
+        "remote_iban",
+        "iban",
+        "creditor_iban",
+        "debtor_iban",
+    ]
+    for key in direct_keys:
+        iban = _normalize_iban_candidate(data.get(key))
+        if iban:
+            return iban
+
+    for key, raw in data.items():
+        if "iban" not in str(key).lower():
+            continue
+        iban = _normalize_iban_candidate(raw)
+        if iban:
+            return iban
+
+    # Fallback for purpose lines that contain "IBAN <...>" or plain IBAN-like tokens.
+    haystack = f"{purpose} {data.get('purpose', '')}".upper()
+    for match in re.finditer(r"[A-Z]{2}[0-9A-Z ]{13,40}", haystack):
+        candidate = normalize_iban(match.group(0))
+        if validate_iban(candidate):
+            return candidate
+    return ""
+
+
 def print_transactions(rows, out_format: str, max_purpose: int) -> None:
     if out_format == "json":
         print(json.dumps(rows, ensure_ascii=False))
         return
 
     if out_format == "tsv":
-        print("date\tamount\tcounterparty\tpurpose")
+        print("date\tamount\tcounterparty\tcounterparty_iban\tpurpose")
         for row in rows:
             print(
-                f"{row['date']}\t{row['amount']}\t{row['counterparty']}\t{row['purpose']}"
+                f"{row['date']}\t{row['amount']}\t{row['counterparty']}\t"
+                f"{row.get('counterparty_iban', '')}\t{row['purpose']}"
             )
         return
 
     date_w = 10
     amount_w = max(12, max((len(r["amount"]) for r in rows), default=12))
     cp_w = max(16, min(40, max((len(r["counterparty"]) for r in rows), default=16)))
-    header = f"{'Date':<{date_w}}  {'Amount':>{amount_w}}  {'Counterparty':<{cp_w}}  Purpose"
+    iban_w = max(12, min(34, max((len(r.get("counterparty_iban", "")) for r in rows), default=12)))
+    header = (
+        f"{'Date':<{date_w}}  {'Amount':>{amount_w}}  {'Counterparty':<{cp_w}}  "
+        f"{'IBAN':<{iban_w}}  Purpose"
+    )
     print(header)
     print("-" * len(header))
     for row in rows:
@@ -501,7 +553,11 @@ def print_transactions(rows, out_format: str, max_purpose: int) -> None:
         if max_purpose > 0 and len(purpose) > max_purpose:
             purpose = purpose[: max_purpose - 3] + "..."
         cp = row["counterparty"][:cp_w]
-        print(f"{row['date']:<{date_w}}  {row['amount']:>{amount_w}}  {cp:<{cp_w}}  {purpose}")
+        iban = row.get("counterparty_iban", "")[:iban_w]
+        print(
+            f"{row['date']:<{date_w}}  {row['amount']:>{amount_w}}  "
+            f"{cp:<{cp_w}}  {iban:<{iban_w}}  {purpose}"
+        )
 
 
 def keychain_get_pin(service: str, account: str) -> Optional[str]:
@@ -788,6 +844,7 @@ def cmd_transactions(args, cfg: Config) -> int:
                     purpose = str(raw_purpose)
                 amount = item.data.get("amount", "")
                 booking_date = item.data.get("date", "")
+                counterparty_iban = extract_counterparty_iban(item.data, purpose)
                 counterparty = (
                     item.data.get("applicant_name")
                     or item.data.get("recipient_name")
@@ -802,11 +859,13 @@ def cmd_transactions(args, cfg: Config) -> int:
                 amount = ""
                 booking_date = ""
                 counterparty = ""
+                counterparty_iban = ""
             rows.append(
                 {
                     "date": clean_text(booking_date),
                     "amount": clean_text(amount),
                     "counterparty": clean_text(counterparty),
+                    "counterparty_iban": clean_text(counterparty_iban),
                     "purpose": clean_text(purpose),
                 }
             )
