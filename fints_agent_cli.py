@@ -579,7 +579,8 @@ def complete_tan(
         if not isinstance(resp, NeedTANResponse):
             return resp
 
-        print("\nSCA Challenge:\n", resp.challenge or "Please confirm in your banking app.")
+        # Do not print raw bank challenge text (often localized); keep CLI output consistently English.
+        print("\nSCA challenge: Please confirm this action in your banking app.")
         if getattr(resp, "decoupled", False):
             # Always poll in decoupled mode: no Enter required.
             if decoupled_started is None:
