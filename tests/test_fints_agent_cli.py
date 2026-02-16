@@ -91,15 +91,15 @@ def test_validate_transfer_args_ok():
 
 def test_validate_transfer_args_rejects_invalid():
     args = base_transfer_args(amount="-1")
-    with pytest.raises(SystemExit, match="Betrag muss > 0"):
+    with pytest.raises(SystemExit, match="Amount must be > 0"):
         fac.validate_transfer_args(args)
 
     args = base_transfer_args(to_iban="DE00BAD")
-    with pytest.raises(SystemExit, match="Ungueltige Empfaenger-IBAN"):
+    with pytest.raises(SystemExit, match="Invalid recipient IBAN"):
         fac.validate_transfer_args(args)
 
     args = base_transfer_args(reason="x")
-    with pytest.raises(SystemExit, match="Verwendungszweck ist zu kurz"):
+    with pytest.raises(SystemExit, match="Purpose is too short"):
         fac.validate_transfer_args(args)
 
 
@@ -148,7 +148,7 @@ def test_keychain_get_pin_not_found(monkeypatch):
 def test_keychain_store_pin_failure(monkeypatch):
     proc = SimpleNamespace(returncode=44, stdout="", stderr="boom")
     monkeypatch.setattr(fac.subprocess, "run", lambda *_, **__: proc)
-    with pytest.raises(SystemExit, match="Keychain-Speichern fehlgeschlagen"):
+    with pytest.raises(SystemExit, match="Failed to save to Keychain"):
         fac.keychain_store_pin("svc", "acc", "1234")
 
 
@@ -186,7 +186,7 @@ def test_cmd_keychain_setup_with_dummy_pin(monkeypatch, capsys):
     assert stored == {"service": "dummy-service", "account": "dummy-account", "pin": "0000"}
     assert cfg.keychain_service == "dummy-service"
     assert cfg.keychain_account == "dummy-account"
-    assert "Keychain-Setup ok." in out
+    assert "Keychain setup OK." in out
 
 
 def test_ensure_product_id_prefers_cli_over_env(monkeypatch):
@@ -290,7 +290,7 @@ def test_cmd_transfer_submit_creates_pending(monkeypatch, capsys):
     assert rc == 0
     assert saved["id"] == "abc123def4"
     assert saved["payload"]["retry_blob"] == b"retry"
-    assert "Pending-ID" in out
+    assert "Pending ID" in out
 
 
 def test_cmd_transfer_status_wait_final_deletes_pending(monkeypatch, capsys):
@@ -334,7 +334,7 @@ def test_cmd_transfer_status_wait_final_deletes_pending(monkeypatch, capsys):
     rc = fac.cmd_transfer_status(args, cfg)
     out = capsys.readouterr().out
     assert rc == 0
-    assert "Finales Ergebnis" in out
+    assert "Final result" in out
     assert deleted["id"] == "pending1"
 
 
@@ -412,7 +412,7 @@ def test_cmd_init_applies_provider(monkeypatch, tmp_path, capsys):
     assert cfg.server == "https://fints.dkb.de/fints"
     assert cfg.user_id == "hagenho"
     assert cfg.product_id == "PID"
-    assert "Config gespeichert" in out
+    assert "Config saved" in out
     assert json.loads(out.split("\n", 1)[1])["provider_id"] == "dkb"
 
 
@@ -455,7 +455,7 @@ def test_cmd_onboard_non_bootstrap(monkeypatch, capsys):
     assert cfg.product_id == "PID123"
     assert stored["service"] == "fints-agent-cli-pin"
     assert stored["account"] == "hagenho"
-    assert "Onboarding fertig (ohne bootstrap)." in out
+    assert "Onboarding complete (without bootstrap)." in out
 
 
 def test_cmd_reset_local_yes(monkeypatch, tmp_path, capsys):
@@ -481,7 +481,7 @@ def test_cmd_reset_local_yes(monkeypatch, tmp_path, capsys):
     rc = fac.cmd_reset_local(args, cfg)
     out = capsys.readouterr().out
     assert rc == 0
-    assert "Lokale Settings gelöscht" in out
+    assert "Local settings removed" in out
     assert not cfg_path.exists()
     assert not state_path.exists()
     assert not providers_path.exists()

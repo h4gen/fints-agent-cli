@@ -1,21 +1,21 @@
 # fints-agent-cli
 
-Generische FinTS CLI auf Basis von `python-fints` mit Provider-Registry, Konten/Umsaetzen und SEPA-Transfer.
+Generic FinTS CLI based on `python-fints` with a provider registry, account/balance retrieval, transaction export, and SEPA transfers.
 
 ## Installation
 
 ```bash
-# lokal im Projekt
+# local project environment
 uv sync
 
-# als Tool (global)
+# install as global tool
 uv tool install /Users/hagen/Projects/bank_cli
 
-# oder mit pipx
+# or with pipx
 pipx install /Users/hagen/Projects/bank_cli
 ```
 
-Danach ist der Befehl `fints-agent-cli` verfuegbar.
+After installation, use the command `fints-agent-cli`.
 
 ## Tests
 
@@ -24,7 +24,7 @@ uv sync --group dev
 uv run pytest
 ```
 
-## Schnellstart
+## Quickstart
 
 ```bash
 fints-agent-cli onboard
@@ -33,11 +33,11 @@ fints-agent-cli transactions --days 90
 fints-agent-cli capabilities
 ```
 
-Der `onboard`-Wizard fragt alle Werte Schritt fuer Schritt ab:
-- Provider
-- User-ID
-- PIN (wird direkt in macOS Keychain gespeichert)
-- optional direktes Bootstrap (TAN-Verfahren)
+The `onboard` wizard asks for:
+- provider
+- user ID
+- PIN (stored directly in macOS Keychain)
+- optional bootstrap execution (TAN setup)
 
 ## Transfer
 
@@ -45,24 +45,24 @@ Der `onboard`-Wizard fragt alle Werte Schritt fuer Schritt ab:
 fints-agent-cli transfer \
   --from-iban DE85120300001059281186 \
   --to-iban DE00123456780123456789 \
-  --to-name "Empfaenger GmbH" \
+  --to-name "Recipient GmbH" \
   --amount 12.34 \
   --reason "Test" \
   --yes
 ```
 
-Async-Flow:
+Async flow:
 
 ```bash
 fints-agent-cli transfer-submit ...
 fints-agent-cli transfer-status --wait
 ```
 
-## Hinweise
+## Notes
 
-- Die Registry listet nur Banken mit echtem FinTS-Endpunkt (`fints_url`).
-- AqBanking ist **nicht** nötig fürs normale Onboarding.
-- Optionaler Override fuer den Datenpfad:
-  - `AQBANKING_BANKINFO_DE=/pfad/zu/banks.data`
-- Product-ID via ENV:
+- The registry only includes banks with a real FinTS endpoint (`fints_url`).
+- AqBanking is **not** required for normal onboarding.
+- Optional override for local bankinfo data path:
+  - `AQBANKING_BANKINFO_DE=/path/to/banks.data`
+- Product ID environment variable:
   - `FINTS_AGENT_CLI_PRODUCT_ID`

@@ -105,7 +105,7 @@ def save_pending(pending_id: str, payload: dict) -> None:
 def load_pending(pending_id: str) -> dict:
     path = pending_path(pending_id)
     if not path.exists():
-        raise SystemExit(f"Pending-ID nicht gefunden: {pending_id}")
+        raise SystemExit(f"Pending ID not found: {pending_id}")
     with path.open("rb") as f:
         return pickle.load(f)
 
@@ -352,7 +352,7 @@ def load_providers() -> list[dict]:
 def resolve_provider(provider_ref: str, providers: list[dict]) -> dict:
     ref = (provider_ref or "").strip()
     if not ref:
-        raise SystemExit("Fehlt --provider.")
+        raise SystemExit("Missing --provider.")
 
     by_id = {p.get("id"): p for p in providers}
     if ref in by_id:
@@ -368,8 +368,8 @@ def resolve_provider(provider_ref: str, providers: list[dict]) -> dict:
         return matches[0]
     if len(matches) > 1:
         names = ", ".join(f"{m.get('id')} ({m.get('name')})" for m in matches[:8])
-        raise SystemExit(f"Provider mehrdeutig: {ref}. Treffer: {names}")
-    raise SystemExit(f"Provider nicht gefunden: {ref}")
+        raise SystemExit(f"Ambiguous provider: {ref}. Matches: {names}")
+    raise SystemExit(f"Provider not found: {ref}")
 
 
 def ensure_product_id(cfg: Config, cli_product_id: Optional[str]) -> None:
@@ -385,7 +385,7 @@ def apply_provider_to_config(cfg: Config, provider: dict) -> None:
     if not provider.get("fints_url"):
         raise SystemExit(
             f"Provider '{provider.get('id')}' hat keinen FinTS-Endpunkt. "
-            "Dieser CLI-Mode unterstützt nur FinTS/HBCI PIN/TAN."
+            "This CLI mode only supports FinTS/HBCI PIN/TAN."
         )
     cfg.provider_id = provider.get("id")
     cfg.provider_name = provider.get("name")
@@ -491,7 +491,7 @@ def print_transactions(rows, out_format: str, max_purpose: int) -> None:
     for row in rows:
         purpose = row["purpose"]
         if max_purpose > 0 and len(purpose) > max_purpose:
-            purpose = purpose[: max_purpose - 1] + "…"
+            purpose = purpose[: max_purpose - 3] + "..."
         cp = row["counterparty"][:cp_w]
         print(f"{row['date']:<{date_w}}  {row['amount']:>{amount_w}}  {cp:<{cp_w}}  {purpose}")
 
@@ -518,7 +518,7 @@ def keychain_store_pin(service: str, account: str, pin: str) -> None:
     )
     if proc.returncode != 0:
         err = (proc.stderr or "").strip()
-        raise SystemExit(f"Keychain-Speichern fehlgeschlagen: {err or 'kein Detail'}")
+        raise SystemExit(f"Failed to save to Keychain: {err or 'no details'}")
 
 
 def resolve_keychain(args, cfg: Config) -> tuple[str, str]:
@@ -530,21 +530,21 @@ def resolve_keychain(args, cfg: Config) -> tuple[str, str]:
         or ""
     ).strip()
     if not service or not account:
-        raise SystemExit("Keychain-Service/Account fehlt.")
+        raise SystemExit("Missing Keychain service/account.")
     return service, account
 
 
 def get_pin(args, cfg: Config) -> str:
     if getattr(args, "no_keychain", False):
-        return getpass.getpass("Bank-PIN: ")
+        return getpass.getpass("Bank PIN: ")
     try:
         service, account = resolve_keychain(args, cfg)
     except SystemExit:
-        return getpass.getpass("Bank-PIN: ")
+        return getpass.getpass("Bank PIN: ")
     pin = keychain_get_pin(service, account)
     if pin:
         return pin
-    return getpass.getpass("Bank-PIN: ")
+    return getpass.getpass("Bank PIN: ")
 
 
 def complete_tan(
@@ -560,68 +560,68 @@ def complete_tan(
     decoupled_started = None
     while True:
         if isinstance(resp, NeedVOPResponse):
-            print("VoP-Hinweis der Bank erhalten (Empfängerprüfung).")
+            print("Received bank VoP warning (payee verification).")
             if auto_approve_vop:
-                print("VoP automatisch bestätigt.")
+                print("VoP auto-approved.")
             else:
-                input("Weiter mit VoP-Bestätigung? Enter = ja, Strg+C = Abbruch: ")
+                input("Continue with VoP confirmation? Enter = yes, Ctrl+C = abort: ")
             resp = client.approve_vop_response(resp)
             continue
 
         if not isinstance(resp, NeedTANResponse):
             return resp
 
-        print("\nSCA Challenge:\n", resp.challenge or "Bitte in der Bank-App bestaetigen.")
+        print("\nSCA Challenge:\n", resp.challenge or "Please confirm in your banking app.")
         if getattr(resp, "decoupled", False):
             # Always poll in decoupled mode: no Enter required.
             if decoupled_started is None:
                 decoupled_started = time.time()
                 print(
-                    f"Warte auf App-Freigabe (Polling alle {decoupled_poll_interval:.1f}s, "
-                    f"Timeout {decoupled_timeout}s) ..."
+                    f"Waiting for app approval (poll every {decoupled_poll_interval:.1f}s, "
+                    f"timeout {decoupled_timeout}s) ..."
                 )
             else:
                 if int(time.time() - decoupled_started) >= decoupled_timeout:
-                    raise SystemExit("SCA-App-Freigabe Timeout. Bitte erneut starten.")
+                    raise SystemExit("SCA app approval timeout. Please restart.")
                 time.sleep(decoupled_poll_interval)
             try:
                 resp = client.send_tan(resp, "")
             except FinTSClientError as exc:
                 decoupled_attempts += 1
                 if decoupled_attempts >= 200:
-                    raise SystemExit("SCA-App-Freigabe nicht erfolgreich (Polling).") from exc
+                    raise SystemExit("SCA app approval did not complete (polling).") from exc
                 continue
             continue
         tan = getpass.getpass("TAN: ")
         try:
             resp = client.send_tan(resp, tan)
         except FinTSClientError as exc:
-            raise SystemExit(f"TAN fehlgeschlagen: {exc}") from exc
+            raise SystemExit(f"TAN failed: {exc}") from exc
 
 
 def complete_vop_only(client: FinTS3PinTanClient, resp, *, auto_approve_vop: bool = False):
     while isinstance(resp, NeedVOPResponse):
-        print("VoP-Hinweis der Bank erhalten (Empfängerprüfung).")
+        print("Received bank VoP warning (payee verification).")
         if auto_approve_vop:
-            print("VoP automatisch bestätigt.")
+            print("VoP auto-approved.")
         else:
-            input("Weiter mit VoP-Bestätigung? Enter = ja, Strg+C = Abbruch: ")
+            input("Continue with VoP confirmation? Enter = yes, Ctrl+C = abort: ")
         resp = client.approve_vop_response(resp)
     return resp
 
 
 def pick_account(accounts, from_iban: Optional[str]):
     if not accounts:
-        raise SystemExit("Keine SEPA-Konten gefunden.")
+        raise SystemExit("No SEPA accounts found.")
     if from_iban:
         needle = from_iban.replace(" ", "").upper()
         for acc in accounts:
             if acc.iban.replace(" ", "").upper() == needle:
                 return acc
-        raise SystemExit(f"from-iban nicht gefunden: {from_iban}")
+        raise SystemExit(f"from-iban not found: {from_iban}")
     if len(accounts) == 1:
         return accounts[0]
-    print("Mehrere Konten gefunden. Bitte --from-iban setzen:")
+    print("Multiple accounts found. Please set --from-iban:")
     for acc in accounts:
         print(" -", acc.iban)
     raise SystemExit(2)
@@ -646,7 +646,7 @@ def cmd_providers_list(args, _cfg: Config) -> int:
     print("id\tblz\tname\turl")
     for p in rows:
         print(f"{p.get('id','')}\t{p.get('blz','')}\t{p.get('name','')}\t{p.get('fints_url','')}")
-    print(f"\nTreffer: {len(rows)}")
+    print(f"\nMatches: {len(rows)}")
     return 0
 
 
@@ -659,7 +659,7 @@ def cmd_providers_show(args, _cfg: Config) -> int:
 
 def cmd_capabilities(args, cfg: Config) -> int:
     if not cfg.user_id:
-        raise SystemExit("Bitte erst bootstrap ausfuehren.")
+        raise SystemExit("Please run bootstrap first.")
     ensure_product_id(cfg, args.product_id)
     pin = get_pin(args, cfg)
     client = build_client(cfg, pin)
@@ -699,7 +699,7 @@ def cmd_bootstrap(args, cfg: Config) -> int:
         provider = resolve_provider(args.provider, load_providers())
         apply_provider_to_config(cfg, provider)
         print(
-            f"Provider gesetzt: {provider.get('id')} - {provider.get('name')} "
+            f"Provider set: {provider.get('id')} - {provider.get('name')} "
             f"({provider.get('blz')} -> {provider.get('fints_url')})"
         )
 
@@ -713,7 +713,7 @@ def cmd_bootstrap(args, cfg: Config) -> int:
         cfg.blz = args.blz
     ensure_product_id(cfg, args.product_id)
     if not cfg.user_id:
-        raise SystemExit("Fehlt --user-id")
+        raise SystemExit("Missing --user-id")
 
     pin = get_pin(args, cfg)
     client = build_client(cfg, pin)
@@ -726,7 +726,7 @@ def cmd_bootstrap(args, cfg: Config) -> int:
 
 def cmd_accounts(args, cfg: Config) -> int:
     if not cfg.user_id:
-        raise SystemExit("Bitte erst bootstrap ausfuehren.")
+        raise SystemExit("Please run bootstrap first.")
     ensure_product_id(cfg, args.product_id)
     pin = get_pin(args, cfg)
     client = build_client(cfg, pin)
@@ -745,7 +745,7 @@ def cmd_accounts(args, cfg: Config) -> int:
 
 def cmd_transactions(args, cfg: Config) -> int:
     if not cfg.user_id:
-        raise SystemExit("Bitte erst bootstrap ausfuehren.")
+        raise SystemExit("Please run bootstrap first.")
     ensure_product_id(cfg, args.product_id)
     pin = get_pin(args, cfg)
     client = build_client(cfg, pin)
@@ -761,7 +761,7 @@ def cmd_transactions(args, cfg: Config) -> int:
                 account = acc
                 break
         if args.iban and not account:
-            raise SystemExit(f"IBAN nicht gefunden: {args.iban}")
+            raise SystemExit(f"IBAN not found: {args.iban}")
         if not account:
             # Default: first account
             account = accounts[0]
@@ -811,19 +811,19 @@ def validate_transfer_args(args) -> Decimal:
     try:
         amount = Decimal(args.amount)
     except InvalidOperation as exc:
-        raise SystemExit(f"Ungueltiger Betrag: {args.amount}") from exc
+        raise SystemExit(f"Invalid amount: {args.amount}") from exc
     if amount <= 0:
-        raise SystemExit("Betrag muss > 0 sein.")
+        raise SystemExit("Amount must be > 0.")
     if not validate_iban(args.to_iban):
-        raise SystemExit(f"Ungueltige Empfaenger-IBAN: {args.to_iban}")
+        raise SystemExit(f"Invalid recipient IBAN: {args.to_iban}")
     if args.to_bic and not validate_bic(args.to_bic):
-        raise SystemExit(f"Ungueltige Empfaenger-BIC: {args.to_bic}")
+        raise SystemExit(f"Invalid recipient BIC: {args.to_bic}")
     if len((args.to_name or "").strip()) < 2:
-        raise SystemExit("Empfaengername ist zu kurz.")
+        raise SystemExit("Recipient name is too short.")
     if len((args.reason or "").strip()) < 2:
-        raise SystemExit("Verwendungszweck ist zu kurz.")
+        raise SystemExit("Purpose is too short.")
     if len(args.reason) > 140:
-        raise SystemExit("Verwendungszweck zu lang (max. 140 Zeichen).")
+        raise SystemExit("Purpose is too long (max 140 chars).")
     return amount
 
 
@@ -842,7 +842,7 @@ def submit_transfer_request(client: FinTS3PinTanClient, cfg: Config, args, amoun
 
 def cmd_transfer(args, cfg: Config) -> int:
     if not cfg.user_id:
-        raise SystemExit("Bitte erst bootstrap ausfuehren.")
+        raise SystemExit("Please run bootstrap first.")
     ensure_product_id(cfg, args.product_id)
     amount = validate_transfer_args(args)
 
@@ -856,22 +856,22 @@ def cmd_transfer(args, cfg: Config) -> int:
         auto_approve_vop = auto_mode or bool(args.auto_vop)
         auto_poll = auto_mode or bool(args.auto_poll)
         if args.dry_run:
-            print("DRY-RUN OK (kein Auftrag gesendet)")
-            print("  Von:   ", account.iban)
-            print("  An:    ", normalize_iban(args.to_iban), f"({args.to_name})")
-            print("  Betrag:", amount, "EUR")
-            print("  Zweck: ", args.reason)
+            print("DRY-RUN OK (no order sent)")
+            print("  From:  ", account.iban)
+            print("  To:    ", normalize_iban(args.to_iban), f"({args.to_name})")
+            print("  Amount:", amount, "EUR")
+            print("  Purpose:", args.reason)
             print("  Instant:", bool(args.instant))
             return 0
 
         if not (args.yes or auto_mode):
-            print("\nÜberweisung (Vorschau)")
-            print("  Von:   ", account.iban)
-            print("  An:    ", args.to_iban, f"({args.to_name})")
-            print("  Betrag:", amount, "EUR")
-            print("  Zweck: ", args.reason)
+            print("\nTransfer (preview)")
+            print("  From:  ", account.iban)
+            print("  To:    ", args.to_iban, f"({args.to_name})")
+            print("  Amount:", amount, "EUR")
+            print("  Purpose:", args.reason)
             print("  Instant:", bool(args.instant))
-            input("Senden? Enter = ja, Strg+C = Abbruch: ")
+            input("Send? Enter = yes, Ctrl+C = abort: ")
 
         resp = submit_transfer_request(client, cfg, args, amount, account)
         resp = complete_tan(
@@ -882,7 +882,7 @@ def cmd_transfer(args, cfg: Config) -> int:
             decoupled_poll_interval=args.poll_interval,
             decoupled_timeout=args.poll_timeout,
         )
-        print("\nErgebnis:")
+        print("\nResult:")
         print(getattr(resp, "status", resp))
         responses = getattr(resp, "responses", None)
         if responses:
@@ -898,7 +898,7 @@ def cmd_transfer(args, cfg: Config) -> int:
 
 def cmd_transfer_submit(args, cfg: Config) -> int:
     if not cfg.user_id:
-        raise SystemExit("Bitte erst bootstrap ausfuehren.")
+        raise SystemExit("Please run bootstrap first.")
     ensure_product_id(cfg, args.product_id)
     amount = validate_transfer_args(args)
 
@@ -912,13 +912,13 @@ def cmd_transfer_submit(args, cfg: Config) -> int:
         auto_approve_vop = auto_mode or bool(args.auto_vop)
 
         if not (args.yes or auto_mode):
-            print("\nÜberweisung (Submit Vorschau)")
-            print("  Von:   ", account.iban)
-            print("  An:    ", args.to_iban, f"({args.to_name})")
-            print("  Betrag:", amount, "EUR")
-            print("  Zweck: ", args.reason)
+            print("\nTransfer (submit preview)")
+            print("  From:  ", account.iban)
+            print("  To:    ", args.to_iban, f"({args.to_name})")
+            print("  Amount:", amount, "EUR")
+            print("  Purpose:", args.reason)
             print("  Instant:", bool(args.instant))
-            input("Submit starten? Enter = ja, Strg+C = Abbruch: ")
+            input("Start submit? Enter = yes, Ctrl+C = abort: ")
 
         resp = submit_transfer_request(client, cfg, args, amount, account)
         resp = complete_vop_only(client, resp, auto_approve_vop=auto_approve_vop)
@@ -926,7 +926,7 @@ def cmd_transfer_submit(args, cfg: Config) -> int:
         if isinstance(resp, NeedTANResponse):
             if not getattr(resp, "decoupled", False):
                 raise SystemExit(
-                    "Asynchrones Status-Polling ist nur fuer decoupled SCA (App-Freigabe) geeignet."
+                    "Async status polling is only supported for decoupled SCA (app approval)."
                 )
             pending_id = uuid.uuid4().hex[:10]
             payload = {
@@ -948,11 +948,11 @@ def cmd_transfer_submit(args, cfg: Config) -> int:
             save_state(payload["client_state"])
             cfg.save()
             print("\nTransfer submitted.")
-            print(f"Pending-ID: {pending_id}")
-            print(f"Status prüfen: uv run fints-agent-cli transfer-status --id {pending_id}")
+            print(f"Pending ID: {pending_id}")
+            print(f"Check status: uv run fints-agent-cli transfer-status --id {pending_id}")
             return 0
 
-        print("\nErgebnis (ohne Pending):")
+        print("\nResult (without pending):")
         print(getattr(resp, "status", resp))
         responses = getattr(resp, "responses", None)
         if responses:
@@ -968,14 +968,14 @@ def cmd_transfer_submit(args, cfg: Config) -> int:
 
 def cmd_transfer_status(args, cfg: Config) -> int:
     if not cfg.user_id:
-        raise SystemExit("Bitte erst bootstrap ausfuehren.")
+        raise SystemExit("Please run bootstrap first.")
     ensure_product_id(cfg, args.product_id)
 
     pending_id = args.id
     if not pending_id:
         ids = list_pending_ids()
         if not ids:
-            raise SystemExit("Keine Pending-Transfers vorhanden.")
+            raise SystemExit("No pending transfers found.")
         pending_id = ids[0]
 
     payload = load_pending(pending_id)
@@ -997,7 +997,7 @@ def cmd_transfer_status(args, cfg: Config) -> int:
             try:
                 resp = client.send_tan(retry, "")
             except FinTSClientError as exc:
-                print(f"Noch pending/kein finaler Status: {exc}")
+                print(f"Still pending/no final status: {exc}")
                 return 0
 
         if isinstance(resp, NeedTANResponse):
@@ -1008,10 +1008,10 @@ def cmd_transfer_status(args, cfg: Config) -> int:
             save_pending(pending_id, payload)
             save_state(payload["client_state"])
             cfg.save()
-            print(f"Pending-ID {pending_id}: noch nicht final bestätigt.")
+            print(f"Pending ID {pending_id}: not final yet.")
             return 0
 
-        print("\nFinales Ergebnis:")
+        print("\nFinal result:")
         print(getattr(resp, "status", resp))
         responses = getattr(resp, "responses", None)
         if responses:
@@ -1033,14 +1033,14 @@ def cmd_keychain_setup(args, cfg: Config) -> int:
     account = (args.keychain_account or cfg.keychain_account or cfg.user_id or "").strip()
     service = (args.keychain_service or cfg.keychain_service).strip()
     if not account:
-        raise SystemExit("Fehlt Account: --keychain-account oder --user-id setzen.")
+        raise SystemExit("Missing account: set --keychain-account or --user-id.")
 
-    pin = getpass.getpass("Bank-PIN (wird in Keychain gespeichert): ")
+    pin = getpass.getpass("Bank PIN (will be stored in Keychain): ")
     keychain_store_pin(service, account, pin)
     cfg.keychain_service = service
     cfg.keychain_account = account
     cfg.save()
-    print(f"Keychain-Setup ok. Service={service}, Account={account}, Key={pin_key(cfg)}")
+    print(f"Keychain setup OK. Service={service}, Account={account}, Key={pin_key(cfg)}")
     return 0
 
 
@@ -1059,7 +1059,7 @@ def cmd_init(args, cfg: Config) -> int:
     if args.keychain_account:
         cfg.keychain_account = args.keychain_account
     cfg.save()
-    print(f"Config gespeichert unter: {CFG_PATH}")
+    print(f"Config saved at: {CFG_PATH}")
     print(json.dumps(asdict(cfg), indent=2, ensure_ascii=False))
     return 0
 
@@ -1072,7 +1072,7 @@ def _prompt_value(prompt: str, default: Optional[str] = None, required: bool = F
             value = str(default)
         if value or not required:
             return value
-        print("Wert erforderlich.")
+        print("Value required.")
 
 
 def _prompt_yes_no(prompt: str, default_yes: bool = True) -> bool:
@@ -1084,7 +1084,7 @@ def _prompt_yes_no(prompt: str, default_yes: bool = True) -> bool:
 
 
 def cmd_onboard(args, cfg: Config) -> int:
-    print("Onboarding gestartet.")
+    print("Onboarding started.")
 
     providers = load_providers()
     provider_default = args.provider or cfg.provider_id or "dkb"
@@ -1095,7 +1095,7 @@ def cmd_onboard(args, cfg: Config) -> int:
             break
         except SystemExit as exc:
             print(str(exc))
-            print("Tipp: fints-agent-cli providers-list --search <name>")
+            print("Tip: fints-agent-cli providers-list --search <name>")
             provider_default = ""
 
     apply_provider_to_config(cfg, provider)
@@ -1117,22 +1117,22 @@ def cmd_onboard(args, cfg: Config) -> int:
 
     pin = getpass.getpass("PIN (wird in Keychain gespeichert): ")
     if not pin:
-        raise SystemExit("PIN darf nicht leer sein.")
+        raise SystemExit("PIN must not be empty.")
     keychain_store_pin(cfg.keychain_service, cfg.keychain_account, pin)
     cfg.save()
-    print(f"Config gespeichert: {CFG_PATH}")
-    print(f"PIN gespeichert in Keychain: service={cfg.keychain_service} account={cfg.keychain_account}")
+    print(f"Config saved: {CFG_PATH}")
+    print(f"PIN saved in Keychain: service={cfg.keychain_service} account={cfg.keychain_account}")
 
     if args.no_bootstrap:
-        print("Onboarding fertig (ohne bootstrap).")
-        print("Nächster Schritt: fints-agent-cli bootstrap")
+        print("Onboarding complete (without bootstrap).")
+        print("Next step: fints-agent-cli bootstrap")
         return 0
 
     client = build_client(cfg, pin)
     minimal_interactive_cli_bootstrap(client)
     save_state(client.deconstruct(including_private=True))
     cfg.save()
-    print("Onboarding + Bootstrap abgeschlossen.")
+    print("Onboarding + bootstrap completed.")
     return 0
 
 
@@ -1141,17 +1141,17 @@ def cmd_reset_local(args, _cfg: Config) -> int:
     pending_paths = list(PENDING_DIR.glob("*.pkl")) if PENDING_DIR.exists() else []
 
     if not args.yes:
-        print("Lokale Dateien, die gelöscht werden:")
+        print("Local files that will be removed:")
         for p in targets:
             if p.exists():
                 print(f" - {p}")
         for p in pending_paths:
             print(f" - {p}")
         if not any(p.exists() for p in targets) and not pending_paths:
-            print("Nichts zu löschen.")
+            print("Nothing to remove.")
             return 0
-        if not _prompt_yes_no("Wirklich alles lokal löschen?", default_yes=False):
-            print("Abgebrochen.")
+        if not _prompt_yes_no("Delete all local data?", default_yes=False):
+            print("Aborted.")
             return 1
 
     removed = 0
@@ -1168,14 +1168,14 @@ def cmd_reset_local(args, _cfg: Config) -> int:
             PENDING_DIR.rmdir()
         except OSError:
             pass
-    print(f"Lokale Settings gelöscht ({removed} Dateien).")
+    print(f"Local settings removed ({removed} files).")
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="fints-agent-cli",
-        description="FinTS Banking CLI (Konten, Umsaetze, Ueberweisung).",
+        description="FinTS Banking CLI (accounts, transactions, transfers).",
         epilog=(
             "Quickstart:\n"
             "  fints-agent-cli onboard\n"
@@ -1184,165 +1184,165 @@ def main() -> int:
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    parser.add_argument("--debug", action="store_true", help="Debug-Logs aktivieren (nur bei Bedarf)")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logs (only when needed)")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_plist = sub.add_parser(
         "providers-list",
-        help="Bankliste anzeigen",
-        description="Listet bekannte FinTS-Banken aus der statischen Provider-Registry.",
+        help="List banks",
+        description="List known FinTS banks from the static provider registry.",
     )
-    p_plist.add_argument("--search", default=None, help="Filter auf Name/ID/BLZ, z.B. 'dkb'")
-    p_plist.add_argument("--country", default=None, help="Optionaler Ländercode, z.B. DE")
-    p_plist.add_argument("--limit", type=int, default=80, help="Maximale Trefferzahl")
+    p_plist.add_argument("--search", default=None, help="Filter by name/id/bank code, e.g. 'dkb'")
+    p_plist.add_argument("--country", default=None, help="Optional country code, e.g. DE")
+    p_plist.add_argument("--limit", type=int, default=80, help="Maximum number of matches")
 
     p_pshow = sub.add_parser(
         "providers-show",
-        help="Bankdetails anzeigen",
-        description="Zeigt alle hinterlegten Parameter eines Providers (BLZ, URL, etc.).",
+        help="Show bank details",
+        description="Show all stored provider parameters (bank code, URL, etc.).",
     )
-    p_pshow.add_argument("--provider", required=True, help="Provider-ID, BLZ oder Name")
+    p_pshow.add_argument("--provider", required=True, help="Provider ID, bank code, or name")
 
     p_init = sub.add_parser(
         "init",
-        help="Config direkt setzen",
-        description="Setzt Konfigurationswerte ohne interaktiven Wizard.",
+        help="Set config directly",
+        description="Set configuration values without the interactive wizard.",
     )
-    p_init.add_argument("--provider", default=None, help="Provider-ID, BLZ oder Name")
-    p_init.add_argument("--user-id", default=None, help="Bank-Loginname")
-    p_init.add_argument("--customer-id", default=None, help="Optional, falls Bank erforderlich")
-    p_init.add_argument("--product-id", default=None, help="Optional; sonst interner Default")
-    p_init.add_argument("--keychain-service", default=None, help="macOS Keychain Service-Name")
-    p_init.add_argument("--keychain-account", default=None, help="macOS Keychain Account-Name")
+    p_init.add_argument("--provider", default=None, help="Provider ID, bank code, or name")
+    p_init.add_argument("--user-id", default=None, help="Bank login name")
+    p_init.add_argument("--customer-id", default=None, help="Optional, if required by bank")
+    p_init.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
+    p_init.add_argument("--keychain-service", default=None, help="macOS Keychain service name")
+    p_init.add_argument("--keychain-account", default=None, help="macOS Keychain account name")
 
     p_onb = sub.add_parser(
         "onboard",
-        help="Interaktives Setup",
+        help="Interactive setup",
         description=(
-            "Einmal-Setup fuer normale Nutzer.\n"
-            "Fragt Provider, User-ID und PIN ab, speichert PIN in Keychain,\n"
-            "und startet optional sofort das TAN-Bootstrap."
+            "One-time setup for normal users.\n"
+            "Asks for provider, user ID and PIN, stores the PIN in Keychain,\n"
+            "and optionally starts TAN bootstrap immediately."
         ),
-        epilog="Beispiel:\n  fints-agent-cli onboard",
+        epilog="Example:\n  fints-agent-cli onboard",
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    p_onb.add_argument("--provider", default=None, help="Provider-ID, BLZ oder Name (optional, sonst Prompt)")
-    p_onb.add_argument("--user-id", default=None, help="Bank-Loginname (optional, sonst Prompt)")
-    p_onb.add_argument("--no-bootstrap", action="store_true", help="Nur config+keychain, kein TAN-bootstrap")
+    p_onb.add_argument("--provider", default=None, help="Provider ID, bank code, or name (optional; otherwise prompt)")
+    p_onb.add_argument("--user-id", default=None, help="Bank login name (optional; otherwise prompt)")
+    p_onb.add_argument("--no-bootstrap", action="store_true", help="Only config+keychain, no TAN bootstrap")
 
     p_reset = sub.add_parser(
         "reset-local",
-        help="Lokale Daten löschen",
-        description="Löscht lokale Config/State/Pending-Dateien unter ~/.config/fints-agent-cli.",
+        help="Delete local data",
+        description="Deletes local config/state/pending files under ~/.config/fints-agent-cli.",
     )
-    p_reset.add_argument("-y", "--yes", action="store_true", help="Ohne Rückfrage löschen")
+    p_reset.add_argument("-y", "--yes", action="store_true", help="Delete without confirmation")
 
     p_boot = sub.add_parser(
         "bootstrap",
-        help="TAN-Setup erneuern",
-        description="Führt den FinTS TAN-Mechanismus-Setup erneut aus.",
+        help="Rerun TAN setup",
+        description="Runs FinTS TAN mechanism setup again.",
     )
-    p_boot.add_argument("--user-id", help="Bank-Loginname")
-    p_boot.add_argument("--customer-id", default=None, help="Optional, falls Bank erforderlich")
-    p_boot.add_argument("--product-id", default=None, help="Optional; sonst interner Default")
-    p_boot.add_argument("--provider", default=None, help="Provider-ID, BLZ oder Name (setzt BLZ+URL)")
-    p_boot.add_argument("--blz", default=None, help="Override BLZ")
-    p_boot.add_argument("--server", default=None, help="Override FinTS-URL")
-    p_boot.add_argument("--keychain-service", default=None, help="Override Keychain Service")
-    p_boot.add_argument("--keychain-account", default=None, help="Override Keychain Account")
-    p_boot.add_argument("--no-keychain", action="store_true", help="PIN nicht aus Keychain lesen")
+    p_boot.add_argument("--user-id", help="Bank login name")
+    p_boot.add_argument("--customer-id", default=None, help="Optional, if required by bank")
+    p_boot.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
+    p_boot.add_argument("--provider", default=None, help="Provider ID, bank code, or name (sets bank code + URL)")
+    p_boot.add_argument("--blz", default=None, help="Override bank code")
+    p_boot.add_argument("--server", default=None, help="Override FinTS URL")
+    p_boot.add_argument("--keychain-service", default=None, help="Override keychain service")
+    p_boot.add_argument("--keychain-account", default=None, help="Override keychain account")
+    p_boot.add_argument("--no-keychain", action="store_true", help="Do not read PIN from Keychain")
 
-    p_acc = sub.add_parser("accounts", help="Konten + Salden", description="Listet Konten und aktuelle Salden.")
-    p_acc.add_argument("--product-id", default=None, help="Optional; sonst interner Default")
-    p_acc.add_argument("--keychain-service", default=None, help="Override Keychain Service")
-    p_acc.add_argument("--keychain-account", default=None, help="Override Keychain Account")
-    p_acc.add_argument("--no-keychain", action="store_true", help="PIN nicht aus Keychain lesen")
+    p_acc = sub.add_parser("accounts", help="Accounts + balances", description="List accounts and current balances.")
+    p_acc.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
+    p_acc.add_argument("--keychain-service", default=None, help="Override keychain service")
+    p_acc.add_argument("--keychain-account", default=None, help="Override keychain account")
+    p_acc.add_argument("--no-keychain", action="store_true", help="Do not read PIN from Keychain")
 
     p_tx = sub.add_parser(
         "transactions",
-        help="Umsätze abrufen",
-        description="Lädt Umsätze für ein Konto (oder Standardkonto).",
+        help="Fetch transactions",
+        description="Fetch transactions for one account (or default account).",
     )
-    p_tx.add_argument("--product-id", default=None, help="Optional; sonst interner Default")
-    p_tx.add_argument("--iban", default=None, help="Konto-IBAN; ohne Angabe wird Standardkonto genutzt")
-    p_tx.add_argument("--days", type=int, default=90, help="Zeitraum rückwirkend in Tagen")
-    p_tx.add_argument("--format", choices=["pretty", "tsv", "json"], default="pretty", help="Ausgabeformat")
-    p_tx.add_argument("--max-purpose", type=int, default=110, help="Max. Zwecktextlänge (pretty)")
-    p_tx.add_argument("--keychain-service", default=None, help="Override Keychain Service")
-    p_tx.add_argument("--keychain-account", default=None, help="Override Keychain Account")
-    p_tx.add_argument("--no-keychain", action="store_true", help="PIN nicht aus Keychain lesen")
+    p_tx.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
+    p_tx.add_argument("--iban", default=None, help="Account IBAN; default account is used if omitted")
+    p_tx.add_argument("--days", type=int, default=90, help="Lookback window in days")
+    p_tx.add_argument("--format", choices=["pretty", "tsv", "json"], default="pretty", help="Output format")
+    p_tx.add_argument("--max-purpose", type=int, default=110, help="Max purpose text length (pretty)")
+    p_tx.add_argument("--keychain-service", default=None, help="Override keychain service")
+    p_tx.add_argument("--keychain-account", default=None, help="Override keychain account")
+    p_tx.add_argument("--no-keychain", action="store_true", help="Do not read PIN from Keychain")
 
-    p_cap = sub.add_parser("capabilities", help="Live-Discovery von FinTS-Operationen (BPD/UPD)")
-    p_cap.add_argument("--product-id", default=None, help="Optional; sonst interner Default")
-    p_cap.add_argument("--iban", default=None, help="Optional auf eine IBAN filtern")
+    p_cap = sub.add_parser("capabilities", help="Live discovery of FinTS operations (BPD/UPD)")
+    p_cap.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
+    p_cap.add_argument("--iban", default=None, help="Optionally filter to one IBAN")
     p_cap.add_argument("--keychain-service", default=None)
     p_cap.add_argument("--keychain-account", default=None)
     p_cap.add_argument("--no-keychain", action="store_true")
 
-    p_tr = sub.add_parser("transfer", help="SEPA Überweisung senden", description="Sendet eine SEPA-Überweisung.")
-    p_tr.add_argument("--product-id", default=None, help="Optional; sonst interner Default")
-    p_tr.add_argument("--from-iban", default=None, help="Sender-IBAN (bei mehreren Konten empfohlen)")
-    p_tr.add_argument("--to-iban", required=True, help="Empfänger-IBAN")
-    p_tr.add_argument("--to-bic", default=None, help="Empfänger-BIC (optional)")
-    p_tr.add_argument("--to-name", required=True, help="Empfängername")
-    p_tr.add_argument("--amount", required=True, help="z.B. 12.34")
-    p_tr.add_argument("--reason", required=True, help="Verwendungszweck")
-    p_tr.add_argument("--sender-name", default=None, help="Absendername im Auftrag (optional)")
-    p_tr.add_argument("--instant", action="store_true", help="Echtzeit-Überweisung anfordern")
-    p_tr.add_argument("--dry-run", action="store_true", help="Nur lokal validieren, nichts senden")
+    p_tr = sub.add_parser("transfer", help="Send SEPA transfer", description="Sends a SEPA transfer.")
+    p_tr.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
+    p_tr.add_argument("--from-iban", default=None, help="Sender IBAN (recommended with multiple accounts)")
+    p_tr.add_argument("--to-iban", required=True, help="Recipient IBAN")
+    p_tr.add_argument("--to-bic", default=None, help="Recipient BIC (optional)")
+    p_tr.add_argument("--to-name", required=True, help="Recipient name")
+    p_tr.add_argument("--amount", required=True, help="e.g. 12.34")
+    p_tr.add_argument("--reason", required=True, help="Purpose")
+    p_tr.add_argument("--sender-name", default=None, help="Sender name in payment order (optional)")
+    p_tr.add_argument("--instant", action="store_true", help="Request instant transfer")
+    p_tr.add_argument("--dry-run", action="store_true", help="Validate locally only, send nothing")
     p_tr.add_argument("--auto", action="store_true", help="No prompts: -y + auto VoP + auto app polling")
-    p_tr.add_argument("--auto-vop", action="store_true", help="VoP-Hinweise automatisch bestätigen")
-    p_tr.add_argument("--auto-poll", action="store_true", help="Decoupled SCA automatisch pollen")
-    p_tr.add_argument("--poll-interval", type=float, default=2.0, help="Polling-Intervall in Sekunden")
-    p_tr.add_argument("--poll-timeout", type=int, default=180, help="Polling-Timeout in Sekunden")
-    p_tr.add_argument("-y", "--yes", action="store_true", help="Rückfragen überspringen")
-    p_tr.add_argument("--keychain-service", default=None, help="Override Keychain Service")
-    p_tr.add_argument("--keychain-account", default=None, help="Override Keychain Account")
-    p_tr.add_argument("--no-keychain", action="store_true", help="PIN nicht aus Keychain lesen")
+    p_tr.add_argument("--auto-vop", action="store_true", help="Auto-approve VoP prompts")
+    p_tr.add_argument("--auto-poll", action="store_true", help="Auto-poll decoupled SCA")
+    p_tr.add_argument("--poll-interval", type=float, default=2.0, help="Polling interval in seconds")
+    p_tr.add_argument("--poll-timeout", type=int, default=180, help="Polling timeout in seconds")
+    p_tr.add_argument("-y", "--yes", action="store_true", help="Skip prompts")
+    p_tr.add_argument("--keychain-service", default=None, help="Override keychain service")
+    p_tr.add_argument("--keychain-account", default=None, help="Override keychain account")
+    p_tr.add_argument("--no-keychain", action="store_true", help="Do not read PIN from Keychain")
 
     p_tsub = sub.add_parser(
         "transfer-submit",
-        help="Transfer asynchron starten",
-        description="Startet Auftrag und liefert Pending-ID zur späteren Statusprüfung.",
+        help="Start transfer asynchronously",
+        description="Starts order and returns pending ID for later status checks.",
     )
-    p_tsub.add_argument("--product-id", default=None, help="Optional; sonst interner Default")
+    p_tsub.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
     p_tsub.add_argument("--from-iban", default=None)
-    p_tsub.add_argument("--to-iban", required=True, help="Empfänger-IBAN")
-    p_tsub.add_argument("--to-bic", default=None, help="Empfänger-BIC (optional)")
-    p_tsub.add_argument("--to-name", required=True, help="Empfängername")
-    p_tsub.add_argument("--amount", required=True, help="z.B. 12.34")
-    p_tsub.add_argument("--reason", required=True, help="Verwendungszweck")
-    p_tsub.add_argument("--sender-name", default=None, help="Absendername im Auftrag (optional)")
-    p_tsub.add_argument("--instant", action="store_true", help="Echtzeit-Überweisung anfordern")
+    p_tsub.add_argument("--to-iban", required=True, help="Recipient IBAN")
+    p_tsub.add_argument("--to-bic", default=None, help="Recipient BIC (optional)")
+    p_tsub.add_argument("--to-name", required=True, help="Recipient name")
+    p_tsub.add_argument("--amount", required=True, help="e.g. 12.34")
+    p_tsub.add_argument("--reason", required=True, help="Purpose")
+    p_tsub.add_argument("--sender-name", default=None, help="Sender name in payment order (optional)")
+    p_tsub.add_argument("--instant", action="store_true", help="Request instant transfer")
     p_tsub.add_argument("--auto", action="store_true", help="No prompts: -y + auto VoP")
-    p_tsub.add_argument("--auto-vop", action="store_true", help="VoP-Hinweise automatisch bestätigen")
-    p_tsub.add_argument("-y", "--yes", action="store_true", help="Rückfragen überspringen")
-    p_tsub.add_argument("--keychain-service", default=None, help="Override Keychain Service")
-    p_tsub.add_argument("--keychain-account", default=None, help="Override Keychain Account")
-    p_tsub.add_argument("--no-keychain", action="store_true", help="PIN nicht aus Keychain lesen")
+    p_tsub.add_argument("--auto-vop", action="store_true", help="Auto-approve VoP prompts")
+    p_tsub.add_argument("-y", "--yes", action="store_true", help="Skip prompts")
+    p_tsub.add_argument("--keychain-service", default=None, help="Override keychain service")
+    p_tsub.add_argument("--keychain-account", default=None, help="Override keychain account")
+    p_tsub.add_argument("--no-keychain", action="store_true", help="Do not read PIN from Keychain")
 
     p_tstatus = sub.add_parser(
         "transfer-status",
-        help="Status eines async Transfers",
-        description="Prüft/fortsetzt einen zuvor gestarteten async Transfer per Pending-ID.",
+        help="Status of an async transfer",
+        description="Checks/continues a previously started async transfer by pending ID.",
     )
-    p_tstatus.add_argument("--product-id", default=None, help="Optional; sonst interner Default")
-    p_tstatus.add_argument("--id", default=None, help="Pending-ID (default: neueste)")
-    p_tstatus.add_argument("--wait", action="store_true", help="Auto-polling bis final oder Timeout")
-    p_tstatus.add_argument("--poll-interval", type=float, default=2.0, help="Polling-Intervall in Sekunden")
-    p_tstatus.add_argument("--poll-timeout", type=int, default=180, help="Polling-Timeout in Sekunden")
-    p_tstatus.add_argument("--keychain-service", default=None, help="Override Keychain Service")
-    p_tstatus.add_argument("--keychain-account", default=None, help="Override Keychain Account")
-    p_tstatus.add_argument("--no-keychain", action="store_true", help="PIN nicht aus Keychain lesen")
+    p_tstatus.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
+    p_tstatus.add_argument("--id", default=None, help="Pending ID (default: newest)")
+    p_tstatus.add_argument("--wait", action="store_true", help="Auto-poll until final or timeout")
+    p_tstatus.add_argument("--poll-interval", type=float, default=2.0, help="Polling interval in seconds")
+    p_tstatus.add_argument("--poll-timeout", type=int, default=180, help="Polling timeout in seconds")
+    p_tstatus.add_argument("--keychain-service", default=None, help="Override keychain service")
+    p_tstatus.add_argument("--keychain-account", default=None, help="Override keychain account")
+    p_tstatus.add_argument("--no-keychain", action="store_true", help="Do not read PIN from Keychain")
 
     p_kc = sub.add_parser(
         "keychain-setup",
-        help="PIN in Keychain speichern",
-        description="Speichert PIN in macOS Keychain für spätere automatische Nutzung.",
+        help="Store PIN in Keychain",
+        description="Stores PIN in macOS Keychain for later automatic use.",
     )
-    p_kc.add_argument("--user-id", default=None, help="Bank-Loginname")
-    p_kc.add_argument("--keychain-service", default=None, help="Keychain Service-Name")
-    p_kc.add_argument("--keychain-account", default=None, help="Keychain Account-Name")
+    p_kc.add_argument("--user-id", default=None, help="Bank login name")
+    p_kc.add_argument("--keychain-service", default=None, help="Keychain service name")
+    p_kc.add_argument("--keychain-account", default=None, help="Keychain account name")
 
     args = parser.parse_args()
     if args.debug:
