@@ -15,8 +15,6 @@ dev = [
 
 [project.scripts]
 fints-agent-cli = "fints_agent_cli:main"
-dkbfints = "dkbfints:main"
-bankfints = "fints_agent_cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -25,7 +23,6 @@ addopts = "-q"
 [tool.hatch.build.targets.wheel]
 include = [
   "/fints_agent_cli.py",
-  "/dkbfints.py",
   "/providers.json",
   "/README.md",
 ]
@@ -33,7 +30,6 @@ include = [
 [tool.hatch.build.targets.sdist]
 include = [
   "/fints_agent_cli.py",
-  "/dkbfints.py",
   "/providers.json",
   "/tests",
   "/README.md",

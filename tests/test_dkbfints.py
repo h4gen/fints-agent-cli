@@ -44,7 +44,7 @@ def base_cfg() -> dkbfints.Config:
     return dkbfints.Config(
         user_id="hagenho",
         product_id="6151256F3D4F9975B877BD4A2",
-        keychain_service="dkbfints-pin",
+        keychain_service="fints-agent-cli-pin",
         keychain_account="hagenho",
     )
 
@@ -199,7 +199,6 @@ def test_ensure_product_id_prefers_cli_over_env(monkeypatch):
 def test_ensure_product_id_uses_default_when_missing(monkeypatch):
     cfg = dkbfints.Config(product_id=None)
     monkeypatch.delenv(dkbfints.ENV_PRODUCT_ID, raising=False)
-    monkeypatch.delenv(dkbfints.LEGACY_ENV_PRODUCT_ID, raising=False)
     dkbfints.ensure_product_id(cfg, None)
     assert cfg.product_id == dkbfints.DEFAULT_PRODUCT_ID
 

@@ -29,7 +29,6 @@ DEFAULT_PRODUCT_ID = "6151256F3D4F9975B877BD4A2"
 DEFAULT_DECOUPLED_POLL_INTERVAL = 2.0
 DEFAULT_DECOUPLED_TIMEOUT = 300
 ENV_PRODUCT_ID = "FINTS_AGENT_CLI_PRODUCT_ID"
-LEGACY_ENV_PRODUCT_ID = "DKBFINTS_PRODUCT_ID"
 
 APP_DIR = Path.home() / ".config" / "fints-agent-cli"
 CFG_PATH = APP_DIR / "config.json"
@@ -37,8 +36,6 @@ STATE_PATH = APP_DIR / "client_state.bin"
 PENDING_DIR = APP_DIR / "pending"
 BUNDLED_PROVIDERS_PATH = Path(__file__).resolve().with_name("providers.json")
 USER_PROVIDERS_PATH = APP_DIR / "providers.json"
-LEGACY_APP_DIR = Path.home() / ".config" / "dkbfints"
-LEGACY_PROVIDERS_PATH = LEGACY_APP_DIR / "providers.json"
 AQBANKING_BANKINFO_DE_CANDIDATES = [
     Path("/opt/homebrew/Cellar/aqbanking/6.9.1/share/aqbanking/bankinfo/de/banks.data"),
     Path("/opt/homebrew/share/aqbanking/bankinfo/de/banks.data"),
@@ -332,13 +329,6 @@ def merge_providers(*provider_lists: list[dict]) -> list[dict]:
 
 
 def load_providers() -> list[dict]:
-    if not USER_PROVIDERS_PATH.exists() and LEGACY_PROVIDERS_PATH.exists():
-        try:
-            APP_DIR.mkdir(parents=True, exist_ok=True)
-            USER_PROVIDERS_PATH.write_text(LEGACY_PROVIDERS_PATH.read_text(encoding="utf-8"), encoding="utf-8")
-        except OSError:
-            pass
-
     if USER_PROVIDERS_PATH.exists():
         data = json.loads(USER_PROVIDERS_PATH.read_text(encoding="utf-8"))
         if isinstance(data, list):
@@ -387,8 +377,6 @@ def ensure_product_id(cfg: Config, cli_product_id: Optional[str]) -> None:
         cfg.product_id = cli_product_id
     if not cfg.product_id:
         cfg.product_id = os.getenv(ENV_PRODUCT_ID, "").strip() or None
-    if not cfg.product_id:
-        cfg.product_id = os.getenv(LEGACY_ENV_PRODUCT_ID, "").strip() or None
     if not cfg.product_id:
         cfg.product_id = DEFAULT_PRODUCT_ID
 
@@ -1122,7 +1110,6 @@ def cmd_onboard(args, cfg: Config) -> int:
         getattr(args, "product_id", None)
         or cfg.product_id
         or os.getenv(ENV_PRODUCT_ID, "").strip()
-        or os.getenv(LEGACY_ENV_PRODUCT_ID, "").strip()
         or DEFAULT_PRODUCT_ID
     )
     cfg.keychain_service = getattr(args, "keychain_service", None) or cfg.keychain_service or "fints-agent-cli-pin"

@@ -66,4 +66,3 @@ fints-agent-cli transfer-status --wait
   - `AQBANKING_BANKINFO_DE=/pfad/zu/banks.data`
 - Product-ID via ENV:
   - `FINTS_AGENT_CLI_PRODUCT_ID`
-  - Legacy: `DKBFINTS_PRODUCT_ID`
