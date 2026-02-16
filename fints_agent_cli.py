@@ -536,15 +536,15 @@ def resolve_keychain(args, cfg: Config) -> tuple[str, str]:
 
 def get_pin(args, cfg: Config) -> str:
     if getattr(args, "no_keychain", False):
-        return getpass.getpass("DKB PIN: ")
+        return getpass.getpass("Bank-PIN: ")
     try:
         service, account = resolve_keychain(args, cfg)
     except SystemExit:
-        return getpass.getpass("DKB PIN: ")
+        return getpass.getpass("Bank-PIN: ")
     pin = keychain_get_pin(service, account)
     if pin:
         return pin
-    return getpass.getpass("DKB PIN: ")
+    return getpass.getpass("Bank-PIN: ")
 
 
 def complete_tan(
@@ -571,7 +571,7 @@ def complete_tan(
         if not isinstance(resp, NeedTANResponse):
             return resp
 
-        print("\nSCA Challenge:\n", resp.challenge or "Bitte in der DKB App bestaetigen.")
+        print("\nSCA Challenge:\n", resp.challenge or "Bitte in der Bank-App bestaetigen.")
         if getattr(resp, "decoupled", False):
             # Always poll in decoupled mode: no Enter required.
             if decoupled_started is None:
@@ -834,7 +834,7 @@ def submit_transfer_request(client: FinTS3PinTanClient, cfg: Config, args, amoun
         bic=args.to_bic,
         recipient_name=args.to_name,
         amount=amount,
-        account_name=args.sender_name or cfg.user_id or "DKB Konto",
+        account_name=args.sender_name or cfg.user_id or "Bankkonto",
         reason=args.reason,
         instant_payment=bool(args.instant),
     )
@@ -1035,7 +1035,7 @@ def cmd_keychain_setup(args, cfg: Config) -> int:
     if not account:
         raise SystemExit("Fehlt Account: --keychain-account oder --user-id setzen.")
 
-    pin = getpass.getpass("DKB PIN (wird in Keychain gespeichert): ")
+    pin = getpass.getpass("Bank-PIN (wird in Keychain gespeichert): ")
     keychain_store_pin(service, account, pin)
     cfg.keychain_service = service
     cfg.keychain_account = account

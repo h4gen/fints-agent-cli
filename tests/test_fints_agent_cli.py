@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import fints_agent_cli as dkbfints
+import fints_agent_cli as fac
 
 
 class DummyAccount:
@@ -40,8 +40,8 @@ class DummyClient:
         return SimpleNamespace(status="OK", responses=[])
 
 
-def base_cfg() -> dkbfints.Config:
-    return dkbfints.Config(
+def base_cfg() -> fac.Config:
+    return fac.Config(
         user_id="hagenho",
         product_id="6151256F3D4F9975B877BD4A2",
         keychain_service="fints-agent-cli-pin",
@@ -76,31 +76,31 @@ def base_transfer_args(**overrides):
 
 
 def test_validate_iban_and_bic():
-    assert dkbfints.validate_iban("DE02100100109307118603")
-    assert not dkbfints.validate_iban("DE00INVALID")
-    assert dkbfints.validate_bic("DEUTDEFF")
-    assert dkbfints.validate_bic("DEUTDEFF500")
-    assert not dkbfints.validate_bic("BAD")
+    assert fac.validate_iban("DE02100100109307118603")
+    assert not fac.validate_iban("DE00INVALID")
+    assert fac.validate_bic("DEUTDEFF")
+    assert fac.validate_bic("DEUTDEFF500")
+    assert not fac.validate_bic("BAD")
 
 
 def test_validate_transfer_args_ok():
     args = base_transfer_args()
-    amount = dkbfints.validate_transfer_args(args)
+    amount = fac.validate_transfer_args(args)
     assert amount == Decimal("12.34")
 
 
 def test_validate_transfer_args_rejects_invalid():
     args = base_transfer_args(amount="-1")
     with pytest.raises(SystemExit, match="Betrag muss > 0"):
-        dkbfints.validate_transfer_args(args)
+        fac.validate_transfer_args(args)
 
     args = base_transfer_args(to_iban="DE00BAD")
     with pytest.raises(SystemExit, match="Ungueltige Empfaenger-IBAN"):
-        dkbfints.validate_transfer_args(args)
+        fac.validate_transfer_args(args)
 
     args = base_transfer_args(reason="x")
     with pytest.raises(SystemExit, match="Verwendungszweck ist zu kurz"):
-        dkbfints.validate_transfer_args(args)
+        fac.validate_transfer_args(args)
 
 
 def test_get_pin_uses_keychain(monkeypatch):
@@ -108,9 +108,9 @@ def test_get_pin_uses_keychain(monkeypatch):
     args = argparse.Namespace(
         no_keychain=False, keychain_service=None, keychain_account=None
     )
-    monkeypatch.setattr(dkbfints, "keychain_get_pin", lambda *_: "1234")
-    monkeypatch.setattr(dkbfints.getpass, "getpass", lambda *_: "fallback")
-    assert dkbfints.get_pin(args, cfg) == "1234"
+    monkeypatch.setattr(fac, "keychain_get_pin", lambda *_: "1234")
+    monkeypatch.setattr(fac.getpass, "getpass", lambda *_: "fallback")
+    assert fac.get_pin(args, cfg) == "1234"
 
 
 def test_get_pin_falls_back_to_prompt(monkeypatch):
@@ -118,9 +118,9 @@ def test_get_pin_falls_back_to_prompt(monkeypatch):
     args = argparse.Namespace(
         no_keychain=False, keychain_service=None, keychain_account=None
     )
-    monkeypatch.setattr(dkbfints, "keychain_get_pin", lambda *_: None)
-    monkeypatch.setattr(dkbfints.getpass, "getpass", lambda *_: "prompt-pin")
-    assert dkbfints.get_pin(args, cfg) == "prompt-pin"
+    monkeypatch.setattr(fac, "keychain_get_pin", lambda *_: None)
+    monkeypatch.setattr(fac.getpass, "getpass", lambda *_: "prompt-pin")
+    assert fac.get_pin(args, cfg) == "prompt-pin"
 
 
 def test_get_pin_no_keychain_forces_prompt(monkeypatch):
@@ -128,34 +128,34 @@ def test_get_pin_no_keychain_forces_prompt(monkeypatch):
     args = argparse.Namespace(
         no_keychain=True, keychain_service=None, keychain_account=None
     )
-    monkeypatch.setattr(dkbfints, "keychain_get_pin", lambda *_: "should-not-be-used")
-    monkeypatch.setattr(dkbfints.getpass, "getpass", lambda *_: "prompt-only")
-    assert dkbfints.get_pin(args, cfg) == "prompt-only"
+    monkeypatch.setattr(fac, "keychain_get_pin", lambda *_: "should-not-be-used")
+    monkeypatch.setattr(fac.getpass, "getpass", lambda *_: "prompt-only")
+    assert fac.get_pin(args, cfg) == "prompt-only"
 
 
 def test_keychain_get_pin_success(monkeypatch):
     proc = SimpleNamespace(returncode=0, stdout="1234\n", stderr="")
-    monkeypatch.setattr(dkbfints.subprocess, "run", lambda *_, **__: proc)
-    assert dkbfints.keychain_get_pin("svc", "acc") == "1234"
+    monkeypatch.setattr(fac.subprocess, "run", lambda *_, **__: proc)
+    assert fac.keychain_get_pin("svc", "acc") == "1234"
 
 
 def test_keychain_get_pin_not_found(monkeypatch):
     proc = SimpleNamespace(returncode=44, stdout="", stderr="not found")
-    monkeypatch.setattr(dkbfints.subprocess, "run", lambda *_, **__: proc)
-    assert dkbfints.keychain_get_pin("svc", "acc") is None
+    monkeypatch.setattr(fac.subprocess, "run", lambda *_, **__: proc)
+    assert fac.keychain_get_pin("svc", "acc") is None
 
 
 def test_keychain_store_pin_failure(monkeypatch):
     proc = SimpleNamespace(returncode=44, stdout="", stderr="boom")
-    monkeypatch.setattr(dkbfints.subprocess, "run", lambda *_, **__: proc)
+    monkeypatch.setattr(fac.subprocess, "run", lambda *_, **__: proc)
     with pytest.raises(SystemExit, match="Keychain-Speichern fehlgeschlagen"):
-        dkbfints.keychain_store_pin("svc", "acc", "1234")
+        fac.keychain_store_pin("svc", "acc", "1234")
 
 
 def test_resolve_keychain_precedence():
     cfg = base_cfg()
     args = argparse.Namespace(keychain_service="svc-cli", keychain_account="acc-cli")
-    service, account = dkbfints.resolve_keychain(args, cfg)
+    service, account = fac.resolve_keychain(args, cfg)
     assert service == "svc-cli"
     assert account == "acc-cli"
 
@@ -169,7 +169,7 @@ def test_cmd_keychain_setup_with_dummy_pin(monkeypatch, capsys):
         keychain_service="dummy-service",
         keychain_account="dummy-account",
     )
-    monkeypatch.setattr(dkbfints.getpass, "getpass", lambda *_: "0000")
+    monkeypatch.setattr(fac.getpass, "getpass", lambda *_: "0000")
     stored = {}
 
     def _store(service, account, pin):
@@ -177,10 +177,10 @@ def test_cmd_keychain_setup_with_dummy_pin(monkeypatch, capsys):
         stored["account"] = account
         stored["pin"] = pin
 
-    monkeypatch.setattr(dkbfints, "keychain_store_pin", _store)
-    monkeypatch.setattr(dkbfints.Config, "save", lambda *_: None)
+    monkeypatch.setattr(fac, "keychain_store_pin", _store)
+    monkeypatch.setattr(fac.Config, "save", lambda *_: None)
 
-    rc = dkbfints.cmd_keychain_setup(args, cfg)
+    rc = fac.cmd_keychain_setup(args, cfg)
     out = capsys.readouterr().out
     assert rc == 0
     assert stored == {"service": "dummy-service", "account": "dummy-account", "pin": "0000"}
@@ -190,23 +190,23 @@ def test_cmd_keychain_setup_with_dummy_pin(monkeypatch, capsys):
 
 
 def test_ensure_product_id_prefers_cli_over_env(monkeypatch):
-    cfg = dkbfints.Config(product_id=None)
-    monkeypatch.setenv(dkbfints.ENV_PRODUCT_ID, "FROM_ENV")
-    dkbfints.ensure_product_id(cfg, "FROM_CLI")
+    cfg = fac.Config(product_id=None)
+    monkeypatch.setenv(fac.ENV_PRODUCT_ID, "FROM_ENV")
+    fac.ensure_product_id(cfg, "FROM_CLI")
     assert cfg.product_id == "FROM_CLI"
 
 
 def test_ensure_product_id_uses_default_when_missing(monkeypatch):
-    cfg = dkbfints.Config(product_id=None)
-    monkeypatch.delenv(dkbfints.ENV_PRODUCT_ID, raising=False)
-    dkbfints.ensure_product_id(cfg, None)
-    assert cfg.product_id == dkbfints.DEFAULT_PRODUCT_ID
+    cfg = fac.Config(product_id=None)
+    monkeypatch.delenv(fac.ENV_PRODUCT_ID, raising=False)
+    fac.ensure_product_id(cfg, None)
+    assert cfg.product_id == fac.DEFAULT_PRODUCT_ID
 
 
 def test_pick_account_with_multiple_requires_from_iban(capsys):
     accounts = [DummyAccount("DE11"), DummyAccount("DE22")]
     with pytest.raises(SystemExit):
-        dkbfints.pick_account(accounts, None)
+        fac.pick_account(accounts, None)
     out = capsys.readouterr().out
     assert "--from-iban" in out
 
@@ -220,7 +220,7 @@ def test_print_transactions_tsv(capsys):
             "purpose": "VISA Debitkartenumsatz",
         }
     ]
-    dkbfints.print_transactions(rows, "tsv", 120)
+    fac.print_transactions(rows, "tsv", 120)
     out = capsys.readouterr().out
     assert "date\tamount\tcounterparty\tpurpose" in out
     assert "2026-02-16" in out
@@ -231,12 +231,12 @@ def test_cmd_transfer_dry_run_no_submit(monkeypatch, capsys):
     args = base_transfer_args(dry_run=True, yes=False, auto=False)
     client = DummyClient()
 
-    monkeypatch.setattr(dkbfints, "get_pin", lambda *_: "1234")
-    monkeypatch.setattr(dkbfints, "build_client", lambda *_: client)
-    monkeypatch.setattr(dkbfints, "ensure_init_ok", lambda *_: None)
-    monkeypatch.setattr(dkbfints, "complete_tan", lambda _c, resp, **_: resp)
-    monkeypatch.setattr(dkbfints, "save_state", lambda *_: None)
-    monkeypatch.setattr(dkbfints.Config, "save", lambda *_: None)
+    monkeypatch.setattr(fac, "get_pin", lambda *_: "1234")
+    monkeypatch.setattr(fac, "build_client", lambda *_: client)
+    monkeypatch.setattr(fac, "ensure_init_ok", lambda *_: None)
+    monkeypatch.setattr(fac, "complete_tan", lambda _c, resp, **_: resp)
+    monkeypatch.setattr(fac, "save_state", lambda *_: None)
+    monkeypatch.setattr(fac.Config, "save", lambda *_: None)
 
     called = {"transfer": False}
 
@@ -244,9 +244,9 @@ def test_cmd_transfer_dry_run_no_submit(monkeypatch, capsys):
         called["transfer"] = True
         return None
 
-    monkeypatch.setattr(dkbfints, "submit_transfer_request", _submit)
+    monkeypatch.setattr(fac, "submit_transfer_request", _submit)
 
-    rc = dkbfints.cmd_transfer(args, cfg)
+    rc = fac.cmd_transfer(args, cfg)
     out = capsys.readouterr().out
     assert rc == 0
     assert "DRY-RUN OK" in out
@@ -265,17 +265,17 @@ def test_cmd_transfer_submit_creates_pending(monkeypatch, capsys):
         def get_data(self):
             return b"retry"
 
-    monkeypatch.setattr(dkbfints, "NeedTANResponse", DummyNeedTan)
-    monkeypatch.setattr(dkbfints, "get_pin", lambda *_: "1234")
-    monkeypatch.setattr(dkbfints, "build_client", lambda *_: client)
-    monkeypatch.setattr(dkbfints, "ensure_init_ok", lambda *_: None)
-    monkeypatch.setattr(dkbfints, "complete_tan", lambda _c, resp, **_: resp)
-    monkeypatch.setattr(dkbfints, "complete_vop_only", lambda _c, resp, **_: resp)
-    monkeypatch.setattr(dkbfints, "submit_transfer_request", lambda *_: DummyNeedTan())
-    monkeypatch.setattr(dkbfints, "save_state", lambda *_: None)
-    monkeypatch.setattr(dkbfints.Config, "save", lambda *_: None)
-    monkeypatch.setattr(dkbfints.uuid, "uuid4", lambda: SimpleNamespace(hex="abc123def456"))
-    monkeypatch.setattr(dkbfints.time, "time", lambda: 1700000000.0)
+    monkeypatch.setattr(fac, "NeedTANResponse", DummyNeedTan)
+    monkeypatch.setattr(fac, "get_pin", lambda *_: "1234")
+    monkeypatch.setattr(fac, "build_client", lambda *_: client)
+    monkeypatch.setattr(fac, "ensure_init_ok", lambda *_: None)
+    monkeypatch.setattr(fac, "complete_tan", lambda _c, resp, **_: resp)
+    monkeypatch.setattr(fac, "complete_vop_only", lambda _c, resp, **_: resp)
+    monkeypatch.setattr(fac, "submit_transfer_request", lambda *_: DummyNeedTan())
+    monkeypatch.setattr(fac, "save_state", lambda *_: None)
+    monkeypatch.setattr(fac.Config, "save", lambda *_: None)
+    monkeypatch.setattr(fac.uuid, "uuid4", lambda: SimpleNamespace(hex="abc123def456"))
+    monkeypatch.setattr(fac.time, "time", lambda: 1700000000.0)
 
     saved = {}
 
@@ -283,9 +283,9 @@ def test_cmd_transfer_submit_creates_pending(monkeypatch, capsys):
         saved["id"] = pid
         saved["payload"] = payload
 
-    monkeypatch.setattr(dkbfints, "save_pending", _save_pending)
+    monkeypatch.setattr(fac, "save_pending", _save_pending)
 
-    rc = dkbfints.cmd_transfer_submit(args, cfg)
+    rc = fac.cmd_transfer_submit(args, cfg)
     out = capsys.readouterr().out
     assert rc == 0
     assert saved["id"] == "abc123def4"
@@ -320,18 +320,18 @@ def test_cmd_transfer_status_wait_final_deletes_pending(monkeypatch, capsys):
     }
     final = SimpleNamespace(status="SUCCESS", responses=[SimpleNamespace(code="0020", text="OK")])
 
-    monkeypatch.setattr(dkbfints, "NeedRetryResponse", DummyNeedRetry)
-    monkeypatch.setattr(dkbfints, "load_pending", lambda _pid: payload)
-    monkeypatch.setattr(dkbfints, "get_pin", lambda *_: "1234")
-    monkeypatch.setattr(dkbfints, "build_client_with_state", lambda *_: client)
-    monkeypatch.setattr(dkbfints, "complete_tan", lambda _c, _r, **_: final)
-    monkeypatch.setattr(dkbfints, "save_state", lambda *_: None)
-    monkeypatch.setattr(dkbfints.Config, "save", lambda *_: None)
+    monkeypatch.setattr(fac, "NeedRetryResponse", DummyNeedRetry)
+    monkeypatch.setattr(fac, "load_pending", lambda _pid: payload)
+    monkeypatch.setattr(fac, "get_pin", lambda *_: "1234")
+    monkeypatch.setattr(fac, "build_client_with_state", lambda *_: client)
+    monkeypatch.setattr(fac, "complete_tan", lambda _c, _r, **_: final)
+    monkeypatch.setattr(fac, "save_state", lambda *_: None)
+    monkeypatch.setattr(fac.Config, "save", lambda *_: None)
 
     deleted = {"id": None}
-    monkeypatch.setattr(dkbfints, "delete_pending", lambda pid: deleted.__setitem__("id", pid))
+    monkeypatch.setattr(fac, "delete_pending", lambda pid: deleted.__setitem__("id", pid))
 
-    rc = dkbfints.cmd_transfer_status(args, cfg)
+    rc = fac.cmd_transfer_status(args, cfg)
     out = capsys.readouterr().out
     assert rc == 0
     assert "Finales Ergebnis" in out
@@ -368,7 +368,7 @@ services {
 """
     p = tmp_path / "banks.data"
     p.write_text(sample, encoding="utf-8")
-    providers = dkbfints.import_aqbanking_bankinfo(p)
+    providers = fac.import_aqbanking_bankinfo(p)
     assert len(providers) == 1
     assert providers[0]["id"] == "de-50010517"
     assert providers[0]["fints_url"] == "https://fints.ing.de/fints/"
@@ -379,12 +379,12 @@ def test_resolve_provider_by_id_and_blz():
         {"id": "dkb", "name": "Deutsche Kreditbank", "blz": "12030000", "fints_url": "https://fints.dkb.de/fints"},
         {"id": "de-50010517", "name": "ING", "blz": "50010517", "fints_url": "https://fints.ing.de/fints/"},
     ]
-    assert dkbfints.resolve_provider("dkb", providers)["blz"] == "12030000"
-    assert dkbfints.resolve_provider("50010517", providers)["id"] == "de-50010517"
+    assert fac.resolve_provider("dkb", providers)["blz"] == "12030000"
+    assert fac.resolve_provider("50010517", providers)["id"] == "de-50010517"
 
 
 def test_cmd_init_applies_provider(monkeypatch, tmp_path, capsys):
-    cfg = dkbfints.Config()
+    cfg = fac.Config()
     args = argparse.Namespace(
         provider="dkb",
         user_id="hagenho",
@@ -401,10 +401,10 @@ def test_cmd_init_applies_provider(monkeypatch, tmp_path, capsys):
             "fints_url": "https://fints.dkb.de/fints",
         }
     ]
-    monkeypatch.setattr(dkbfints, "load_providers", lambda: providers)
-    monkeypatch.setattr(dkbfints.Config, "save", lambda *_: None)
+    monkeypatch.setattr(fac, "load_providers", lambda: providers)
+    monkeypatch.setattr(fac.Config, "save", lambda *_: None)
 
-    rc = dkbfints.cmd_init(args, cfg)
+    rc = fac.cmd_init(args, cfg)
     out = capsys.readouterr().out
     assert rc == 0
     assert cfg.provider_id == "dkb"
@@ -417,7 +417,7 @@ def test_cmd_init_applies_provider(monkeypatch, tmp_path, capsys):
 
 
 def test_cmd_onboard_non_bootstrap(monkeypatch, capsys):
-    cfg = dkbfints.Config()
+    cfg = fac.Config()
     args = argparse.Namespace(
         provider="dkb",
         user_id="hagenho",
@@ -436,18 +436,18 @@ def test_cmd_onboard_non_bootstrap(monkeypatch, capsys):
             "fints_url": "https://fints.dkb.de/fints",
         }
     ]
-    monkeypatch.setattr(dkbfints, "load_providers", lambda: providers)
-    monkeypatch.setattr(dkbfints, "_prompt_value", lambda _p, default=None, required=False: default or "")
-    monkeypatch.setattr(dkbfints.getpass, "getpass", lambda *_: "0000")
+    monkeypatch.setattr(fac, "load_providers", lambda: providers)
+    monkeypatch.setattr(fac, "_prompt_value", lambda _p, default=None, required=False: default or "")
+    monkeypatch.setattr(fac.getpass, "getpass", lambda *_: "0000")
     stored = {}
     monkeypatch.setattr(
-        dkbfints,
+        fac,
         "keychain_store_pin",
         lambda service, account, pin: stored.update({"service": service, "account": account, "pin": pin}),
     )
-    monkeypatch.setattr(dkbfints.Config, "save", lambda *_: None)
+    monkeypatch.setattr(fac.Config, "save", lambda *_: None)
 
-    rc = dkbfints.cmd_onboard(args, cfg)
+    rc = fac.cmd_onboard(args, cfg)
     out = capsys.readouterr().out
     assert rc == 0
     assert cfg.provider_id == "dkb"
@@ -459,7 +459,7 @@ def test_cmd_onboard_non_bootstrap(monkeypatch, capsys):
 
 
 def test_cmd_reset_local_yes(monkeypatch, tmp_path, capsys):
-    cfg = dkbfints.Config()
+    cfg = fac.Config()
     cfg_path = tmp_path / "config.json"
     state_path = tmp_path / "client_state.bin"
     providers_path = tmp_path / "providers.json"
@@ -472,13 +472,13 @@ def test_cmd_reset_local_yes(monkeypatch, tmp_path, capsys):
     providers_path.write_text("{}", encoding="utf-8")
     pending_file.write_bytes(b"x")
 
-    monkeypatch.setattr(dkbfints, "CFG_PATH", cfg_path)
-    monkeypatch.setattr(dkbfints, "STATE_PATH", state_path)
-    monkeypatch.setattr(dkbfints, "USER_PROVIDERS_PATH", providers_path)
-    monkeypatch.setattr(dkbfints, "PENDING_DIR", pending_dir)
+    monkeypatch.setattr(fac, "CFG_PATH", cfg_path)
+    monkeypatch.setattr(fac, "STATE_PATH", state_path)
+    monkeypatch.setattr(fac, "USER_PROVIDERS_PATH", providers_path)
+    monkeypatch.setattr(fac, "PENDING_DIR", pending_dir)
 
     args = argparse.Namespace(yes=True)
-    rc = dkbfints.cmd_reset_local(args, cfg)
+    rc = fac.cmd_reset_local(args, cfg)
     out = capsys.readouterr().out
     assert rc == 0
     assert "Lokale Settings gelöscht" in out
