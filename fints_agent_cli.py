@@ -52,7 +52,7 @@ class Config:
     customer_id: Optional[str] = None
     product_id: Optional[str] = None
     provider_id: Optional[str] = "dkb"
-    provider_name: Optional[str] = "Deutsche Kreditbank (DKB)"
+    provider_name: Optional[str] = "DKB"
     keychain_service: str = "fints-agent-cli-pin"
     keychain_account: Optional[str] = None
 
@@ -129,7 +129,7 @@ def _default_seed_providers() -> list[dict]:
     return [
         {
             "id": "dkb",
-            "name": "Deutsche Kreditbank (DKB)",
+            "name": "DKB",
             "country": "DE",
             "blz": "12030000",
             "bic": "BYLADEM1001",
@@ -328,25 +328,33 @@ def merge_providers(*provider_lists: list[dict]) -> list[dict]:
     return sorted(providers, key=lambda p: (p.get("name", ""), p.get("id", "")))
 
 
+def normalize_provider_labels(providers: list[dict]) -> list[dict]:
+    # Keep canonical short labels for common providers even when imported data differs.
+    for p in providers:
+        if p.get("id") == "dkb":
+            p["name"] = "DKB"
+    return providers
+
+
 def load_providers() -> list[dict]:
     if USER_PROVIDERS_PATH.exists():
         data = json.loads(USER_PROVIDERS_PATH.read_text(encoding="utf-8"))
         if isinstance(data, list):
-            return data
-        return data.get("providers", [])
+            return normalize_provider_labels(data)
+        return normalize_provider_labels(data.get("providers", []))
 
     if BUNDLED_PROVIDERS_PATH.exists():
         data = json.loads(BUNDLED_PROVIDERS_PATH.read_text(encoding="utf-8"))
         if isinstance(data, list):
-            return data
+            return normalize_provider_labels(data)
         if isinstance(data, dict):
             providers = data.get("providers", [])
             if providers:
-                return providers
+                return normalize_provider_labels(providers)
 
     providers = merge_providers(_default_seed_providers(), import_aqbanking_bankinfo())
     save_providers(providers)
-    return providers
+    return normalize_provider_labels(providers)
 
 
 def resolve_provider(provider_ref: str, providers: list[dict]) -> dict:
@@ -1089,7 +1097,7 @@ def cmd_onboard(args, cfg: Config) -> int:
     providers = load_providers()
     provider_default = args.provider or cfg.provider_id or "dkb"
     while True:
-        provider_ref = _prompt_value("Provider (id/blz/name)", provider_default, required=True)
+        provider_ref = _prompt_value("Provider (id/bank-code/name)", provider_default, required=True)
         try:
             provider = resolve_provider(provider_ref, providers)
             break
@@ -1104,7 +1112,7 @@ def cmd_onboard(args, cfg: Config) -> int:
         f"({provider.get('blz')} -> {provider.get('fints_url')})"
     )
 
-    cfg.user_id = getattr(args, "user_id", None) or _prompt_value("User-ID (Loginname)", cfg.user_id, required=True)
+    cfg.user_id = getattr(args, "user_id", None) or _prompt_value("User ID (login name)", cfg.user_id, required=True)
     cfg.customer_id = getattr(args, "customer_id", None) or cfg.customer_id or None
     cfg.product_id = (
         getattr(args, "product_id", None)
@@ -1115,7 +1123,7 @@ def cmd_onboard(args, cfg: Config) -> int:
     cfg.keychain_service = getattr(args, "keychain_service", None) or cfg.keychain_service or "fints-agent-cli-pin"
     cfg.keychain_account = getattr(args, "keychain_account", None) or cfg.keychain_account or cfg.user_id
 
-    pin = getpass.getpass("PIN (wird in Keychain gespeichert): ")
+    pin = getpass.getpass("PIN (will be stored in Keychain): ")
     if not pin:
         raise SystemExit("PIN must not be empty.")
     keychain_store_pin(cfg.keychain_service, cfg.keychain_account, pin)
