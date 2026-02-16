@@ -1,0 +1,45 @@
+[project]
+name = "fints-agent-cli"
+version = "0.1.0"
+description = "Generic FinTS CLI agent with provider registry and transfer workflows"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "fints>=5,<6",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<9",
+]
+
+[project.scripts]
+fints-agent-cli = "fints_agent_cli:main"
+dkbfints = "dkbfints:main"
+bankfints = "fints_agent_cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.hatch.build.targets.wheel]
+include = [
+  "/fints_agent_cli.py",
+  "/dkbfints.py",
+  "/providers.json",
+  "/README.md",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/fints_agent_cli.py",
+  "/dkbfints.py",
+  "/providers.json",
+  "/tests",
+  "/README.md",
+  "/pyproject.toml",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
