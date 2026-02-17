@@ -9,34 +9,6 @@ Use it to:
 - send SEPA transfers
 - handle app-based SCA approval flows
 
-## Who This Is For
-
-- End users who can run a few terminal commands.
-- AI/automation agents that need deterministic CLI behavior.
-
-If you are running this as an agent, read first:
-- `/Users/hagen/Projects/bank_cli/docs/AGENT_RUNBOOK.md`
-
-## Supported Banks
-
-This project only includes providers with a known FinTS endpoint.
-
-Current registry characteristics:
-- FinTS-focused registry
-- primarily German banks (FinTS ecosystem)
-- includes seeded direct banks such as `dkb`, `ing`, `comdirect`, `consorsbank`
-- plus many additional German institutions from bundled provider data
-
-Check what is available on your installed version:
-
-```bash
-fints-agent-cli providers-list --limit 40
-fints-agent-cli providers-list --search dkb
-fints-agent-cli providers-list --search ing
-fints-agent-cli providers-show --provider dkb
-```
-
-If your bank is not listed by `providers-list`, this tool currently cannot configure it automatically.
 
 ## Install
 
@@ -121,6 +93,36 @@ fints-agent-cli transfer ... --dry-run
 fints-agent-cli transfer-submit ...
 fints-agent-cli transfer-status --wait
 ```
+
+## Who This Is For
+
+- End users who can run a few terminal commands.
+- AI/automation agents that need deterministic CLI behavior.
+
+If you are running this as an agent, read first:
+- `/Users/hagen/Projects/bank_cli/docs/AGENT_RUNBOOK.md`
+
+## Supported Banks
+
+This project only includes providers with a known FinTS endpoint.
+
+Current registry characteristics:
+- FinTS-focused registry
+- primarily German banks (FinTS ecosystem)
+- includes seeded direct banks such as `dkb`, `ing`, `comdirect`, `consorsbank`
+- plus many additional German institutions from bundled provider data
+
+Check what is available on your installed version:
+
+```bash
+fints-agent-cli providers-list --limit 40
+fints-agent-cli providers-list --search dkb
+fints-agent-cli providers-list --search ing
+fints-agent-cli providers-show --provider dkb
+```
+
+If your bank is not listed by `providers-list`, this tool currently cannot configure it automatically.
+
 
 ## Commands Overview
 
