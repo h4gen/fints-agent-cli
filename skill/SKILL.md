@@ -10,6 +10,11 @@ Use this skill when you need to operate German FinTS banking tasks through `fint
 
 This document is written for agents. It defines deterministic flows, expected outputs, and exact next actions.
 
+## Project Links
+
+- GitHub repo: https://github.com/h4gen/fints-agent-cli (review before running commands in your banking environment)
+- ClawHub skill page: https://clawhub.ai/h4gen/fints-banking (review before installing/using)
+
 ## 1) Preconditions
 
 Before running any banking command, verify:
