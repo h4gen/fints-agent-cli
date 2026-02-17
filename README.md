@@ -1,6 +1,7 @@
 # fints-agent-cli
 
-FinTS banking CLI for humans and agents.
+FinTS banking CLI for humans and agents. 
+Works great with Claude Code/Cowork, Codex, OpenClaw.
 
 Use it to:
 - onboard once
