@@ -4,6 +4,27 @@ This runbook is for autonomous or semi-autonomous agents.
 
 Goal: execute banking tasks with minimal ambiguity.
 
+## 0. Scope and Bank Coverage
+
+This CLI operates only on providers with known FinTS endpoints.
+
+Coverage model:
+- registry is FinTS-only
+- currently focused on Germany (FinTS ecosystem reality)
+- seeded direct-bank ids include `dkb`, `ing`, `comdirect`, `consorsbank`
+- additional German providers are bundled in provider data
+
+Always verify coverage from the running binary before onboarding:
+
+```bash
+fints-agent-cli providers-list --limit 50
+fints-agent-cli providers-list --search <bank-name-or-code>
+fints-agent-cli providers-show --provider <provider-id>
+```
+
+If a provider is not returned by `providers-list`, do not guess URLs.
+Treat as unsupported until provider data is updated.
+
 ## 1. Operating Model
 
 `fints-agent-cli` communicates with banks via FinTS and uses:

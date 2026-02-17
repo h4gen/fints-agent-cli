@@ -1,172 +1,176 @@
 # fints-agent-cli
 
-A command-line banking helper for FinTS-enabled banks.
+FinTS banking CLI for humans and agents.
 
-This repository now has two docs entry points:
-- `/Users/hagen/Projects/bank_cli/README.md` for quick start
-- `/Users/hagen/Projects/bank_cli/docs/AGENT_RUNBOOK.md` for full, deterministic agent operation with expected outputs and next actions
+Use it to:
+- onboard once
+- fetch accounts and balances
+- fetch transactions
+- send SEPA transfers
+- handle app-based SCA approval flows
 
-If you are building automation or running this as an agent, start with:
+## Who This Is For
+
+- End users who can run a few terminal commands.
+- AI/automation agents that need deterministic CLI behavior.
+
+If you are running this as an agent, read first:
 - `/Users/hagen/Projects/bank_cli/docs/AGENT_RUNBOOK.md`
 
-## What This Tool Does
+## Supported Banks
 
-`fints-agent-cli` talks to your bank via FinTS and lets you work from Terminal.
+This project only includes providers with a known FinTS endpoint.
 
-Typical flow:
-1. Run one-time onboarding
-2. Check balances and transactions
-3. Send transfers and confirm in your banking app
+Current registry characteristics:
+- FinTS-focused registry
+- primarily German banks (FinTS ecosystem)
+- includes seeded direct banks such as `dkb`, `ing`, `comdirect`, `consorsbank`
+- plus many additional German institutions from bundled provider data
 
-## Safety & Privacy
+Check what is available on your installed version:
 
-- Your PIN is stored in macOS Keychain (not plain text files).
-- You can force manual PIN entry anytime with `--no-keychain`.
-- Normal output is quiet by default; debug logs are only enabled with `--debug`.
+```bash
+fints-agent-cli providers-list --limit 40
+fints-agent-cli providers-list --search dkb
+fints-agent-cli providers-list --search ing
+fints-agent-cli providers-show --provider dkb
+```
+
+If your bank is not listed by `providers-list`, this tool currently cannot configure it automatically.
 
 ## Install
 
-### Easy install (recommended)
+Recommended:
 
 ```bash
 uv tool install fints-agent-cli
 ```
 
-or
+Alternative:
 
 ```bash
 pipx install fints-agent-cli
 ```
 
-### Run from this repo (developer mode)
+From source repo:
 
 ```bash
 uv sync
 uv run fints-agent-cli --help
 ```
 
-## First-Time Setup (Copy/Paste)
+## 60-Second Start
 
-Run:
+### 1) One-time onboarding
 
 ```bash
 fints-agent-cli onboard
 ```
 
-It asks only for:
-- bank/provider (name, id, or bank code)
-- your user/login id
-- your PIN
+You will be asked for:
+- provider (id/name/bank code)
+- user id/login
+- PIN
 
-That is enough for most users.
+The PIN is saved in macOS Keychain.
 
-## Daily Use (Copy/Paste)
-
-Show accounts + balances:
+### 2) Verify account access
 
 ```bash
 fints-agent-cli accounts
 ```
 
-Show recent transactions (last 30 days):
+Expected output format:
+- `<IBAN>\t<Amount>\t<Currency>`
+
+### 3) Fetch transactions
 
 ```bash
 fints-agent-cli transactions --days 30
 ```
 
-Show transactions for a specific account:
+For deterministic account selection:
 
 ```bash
-fints-agent-cli transactions --iban DE00123456780123456789 --days 30
+fints-agent-cli transactions --iban <IBAN> --days 30
 ```
 
-## Sending a Transfer
+## Transfers
 
-### Simple transfer (one command)
+### Synchronous transfer (single flow)
 
 ```bash
 fints-agent-cli transfer \
-  --from-iban DE85120300001059281186 \
-  --to-iban DE00123456780123456789 \
-  --to-name "Recipient GmbH" \
+  --from-iban <FROM_IBAN> \
+  --to-iban <TO_IBAN> \
+  --to-name "Recipient Name" \
   --amount 12.34 \
-  --reason "Invoice 123" \
+  --reason "Reference" \
   --yes --auto
 ```
 
-What happens:
-- command submits the transfer
-- if the bank requires app approval, approve in your banking app
-- CLI continues automatically when possible
-
-### Dry run (no money sent)
+### Dry run (local validation only, no submission)
 
 ```bash
 fints-agent-cli transfer ... --dry-run
 ```
 
-## Async Transfer Mode (Submit now, check later)
-
-Start transfer:
+### Async transfer flow
 
 ```bash
 fints-agent-cli transfer-submit ...
-```
-
-Check status later:
-
-```bash
 fints-agent-cli transfer-status --wait
 ```
 
-## Most Useful Commands
+## Commands Overview
 
 ```text
-onboard             One-time interactive setup
-accounts            List accounts and balances
-transactions        Fetch transactions
-transfer            Send transfer (sync)
-transfer-submit     Start transfer (async)
-transfer-status     Check async transfer status
-keychain-setup      Save/overwrite PIN in Keychain
-reset-local         Delete local app config/state
-providers-list      List supported FinTS banks
-providers-show      Show one provider config
+onboard             Interactive setup
+bootstrap           Re-run TAN/SCA setup
+accounts            Accounts + balances
+transactions        Transactions (pretty/tsv/json)
+transfer            Sync transfer flow
+transfer-submit     Start async transfer
+transfer-status     Continue/check async transfer
+providers-list      List known providers
+providers-show      Show provider details
+keychain-setup      Save/update PIN in Keychain
+reset-local         Delete local config/state/pending files
+capabilities        Live FinTS capability discovery
 ```
 
-## If Something Fails
+## Troubleshooting
 
-Enable debug output for one command:
+Use debug only for diagnosis:
 
 ```bash
 fints-agent-cli --debug transactions --days 30
 ```
 
-Re-run TAN setup if needed:
+Re-run auth setup:
 
 ```bash
 fints-agent-cli bootstrap
 ```
 
-Reset local config/state:
+Reset local state:
 
 ```bash
 fints-agent-cli reset-local
 ```
 
-## Advanced Notes
+## Security Notes
 
-- Provider registry is static and includes only banks with known FinTS endpoints.
-- AqBanking is not required for normal use.
-- Optional env vars:
-  - `FINTS_AGENT_CLI_PRODUCT_ID`
-  - `AQBANKING_BANKINFO_DE`
-- Full operator playbook:
-  - `/Users/hagen/Projects/bank_cli/docs/AGENT_RUNBOOK.md`
+- PIN is read from macOS Keychain by default.
+- You can force manual PIN entry per command with `--no-keychain`.
+- Avoid storing PIN in shell history or plain text files.
+
+## Agent Notes
+
+Agent-friendly guidance with expected outputs and recovery actions:
+- `/Users/hagen/Projects/bank_cli/docs/AGENT_RUNBOOK.md`
 
 ## Development
-
-Run tests:
 
 ```bash
 uv sync --group dev
