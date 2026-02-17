@@ -1,14 +1,13 @@
 # fints-agent-cli
 
-A simple command-line banking helper for FinTS-enabled banks.
+A command-line banking helper for FinTS-enabled banks.
 
-It is designed for people who want to:
-- see balances
-- list transactions
-- send transfers
-- approve securely in their banking app
+This repository now has two docs entry points:
+- `/Users/hagen/Projects/bank_cli/README.md` for quick start
+- `/Users/hagen/Projects/bank_cli/docs/AGENT_RUNBOOK.md` for full, deterministic agent operation with expected outputs and next actions
 
-No coding needed after install.
+If you are building automation or running this as an agent, start with:
+- `/Users/hagen/Projects/bank_cli/docs/AGENT_RUNBOOK.md`
 
 ## What This Tool Does
 
@@ -162,6 +161,8 @@ fints-agent-cli reset-local
 - Optional env vars:
   - `FINTS_AGENT_CLI_PRODUCT_ID`
   - `AQBANKING_BANKINFO_DE`
+- Full operator playbook:
+  - `/Users/hagen/Projects/bank_cli/docs/AGENT_RUNBOOK.md`
 
 ## Development
 
