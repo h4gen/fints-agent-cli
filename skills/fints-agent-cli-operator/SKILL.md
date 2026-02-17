@@ -1,9 +1,9 @@
 ---
 name: fints-agent-cli-operator
-description: Run fints-agent-cli safely and deterministically: provider discovery, onboarding, accounts, transactions, transfers, async status polling, and recovery.
+description: Use this when someone wants to do everyday online banking from terminal: connect their bank once, check balances, read transactions, and send transfers with clear next-step instructions.
 homepage: https://github.com/h4gen/fints-agent-cli
 user-invocable: true
-metadata: {"openclaw":{"emoji":"🏦","category":"banking","tags":["fints","payments","cli","automation"],"requires":{"bins":["fints-agent-cli"]}}}
+metadata: {"openclaw":{"emoji":"🏦","category":"banking","tags":["banking","payments","assistant","operations"],"requires":{"bins":["fints-agent-cli"]},"install":{"package_managers":[{"tool":"uv","cmd":"uv tool install fints-agent-cli"},{"tool":"pipx","cmd":"pipx install fints-agent-cli"}],"verify":"fints-agent-cli --help"}}}
 ---
 
 # fints-agent-cli Operator
