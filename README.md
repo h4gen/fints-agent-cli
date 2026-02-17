@@ -1,60 +1,89 @@
 # fints-agent-cli
 
-Generic FinTS CLI based on `python-fints` with a static provider registry, account/balance retrieval, transaction output, and SEPA transfer workflows.
+A simple command-line banking helper for FinTS-enabled banks.
 
-## Installation
+It is designed for people who want to:
+- see balances
+- list transactions
+- send transfers
+- approve securely in their banking app
+
+No coding needed after install.
+
+## What This Tool Does
+
+`fints-agent-cli` talks to your bank via FinTS and lets you work from Terminal.
+
+Typical flow:
+1. Run one-time onboarding
+2. Check balances and transactions
+3. Send transfers and confirm in your banking app
+
+## Safety & Privacy
+
+- Your PIN is stored in macOS Keychain (not plain text files).
+- You can force manual PIN entry anytime with `--no-keychain`.
+- Normal output is quiet by default; debug logs are only enabled with `--debug`.
+
+## Install
+
+### Easy install (recommended)
 
 ```bash
-# local project env
-uv sync
-
-# run from repo
-uv run fints-agent-cli --help
-
-# install globally (uv tool)
-uv tool install /Users/hagen/Projects/bank_cli
-
-# or with pipx
-pipx install /Users/hagen/Projects/bank_cli
+uv tool install fints-agent-cli
 ```
 
-## Quickstart
+or
+
+```bash
+pipx install fints-agent-cli
+```
+
+### Run from this repo (developer mode)
+
+```bash
+uv sync
+uv run fints-agent-cli --help
+```
+
+## First-Time Setup (Copy/Paste)
+
+Run:
 
 ```bash
 fints-agent-cli onboard
+```
+
+It asks only for:
+- bank/provider (name, id, or bank code)
+- your user/login id
+- your PIN
+
+That is enough for most users.
+
+## Daily Use (Copy/Paste)
+
+Show accounts + balances:
+
+```bash
 fints-agent-cli accounts
+```
+
+Show recent transactions (last 30 days):
+
+```bash
 fints-agent-cli transactions --days 30
-fints-agent-cli capabilities
 ```
 
-The `onboard` flow asks for only:
-- provider (`id`, bank code, or name)
-- user ID (login name)
-- PIN (stored in macOS Keychain)
+Show transactions for a specific account:
 
-By default, onboarding also runs TAN bootstrap. Use `--no-bootstrap` to skip.
-
-## Commands
-
-```text
-providers-list      List banks from static registry
-providers-show      Show one provider config
-init                Write config directly (non-interactive)
-onboard             Interactive setup
-reset-local         Delete local config/state/pending files
-bootstrap           Rerun TAN setup
-accounts            List accounts + balances
-transactions        Fetch transactions
-capabilities        Live FinTS capability discovery
-transfer            Send SEPA transfer (sync)
-transfer-submit     Start transfer asynchronously
-transfer-status     Continue/check async transfer
-keychain-setup      Save/overwrite PIN in Keychain
+```bash
+fints-agent-cli transactions --iban DE00123456780123456789 --days 30
 ```
 
-## Transfers
+## Sending a Transfer
 
-Sync transfer:
+### Simple transfer (one command)
 
 ```bash
 fints-agent-cli transfer \
@@ -62,41 +91,83 @@ fints-agent-cli transfer \
   --to-iban DE00123456780123456789 \
   --to-name "Recipient GmbH" \
   --amount 12.34 \
-  --reason "Test" \
+  --reason "Invoice 123" \
   --yes --auto
 ```
 
-Async flow:
+What happens:
+- command submits the transfer
+- if the bank requires app approval, approve in your banking app
+- CLI continues automatically when possible
+
+### Dry run (no money sent)
+
+```bash
+fints-agent-cli transfer ... --dry-run
+```
+
+## Async Transfer Mode (Submit now, check later)
+
+Start transfer:
 
 ```bash
 fints-agent-cli transfer-submit ...
+```
+
+Check status later:
+
+```bash
 fints-agent-cli transfer-status --wait
 ```
 
-Useful flags:
-- `--dry-run` validates locally without submitting
-- `--auto` minimizes prompts (`-y`, auto VoP, auto polling where applicable)
-- `--poll-interval` and `--poll-timeout` tune async polling
+## Most Useful Commands
 
-## Logging
-
-By default, output is quiet. Enable debug logs only when needed:
-
-```bash
-fints-agent-cli --debug <command> ...
+```text
+onboard             One-time interactive setup
+accounts            List accounts and balances
+transactions        Fetch transactions
+transfer            Send transfer (sync)
+transfer-submit     Start transfer (async)
+transfer-status     Check async transfer status
+keychain-setup      Save/overwrite PIN in Keychain
+reset-local         Delete local app config/state
+providers-list      List supported FinTS banks
+providers-show      Show one provider config
 ```
 
-## Tests
+## If Something Fails
+
+Enable debug output for one command:
+
+```bash
+fints-agent-cli --debug transactions --days 30
+```
+
+Re-run TAN setup if needed:
+
+```bash
+fints-agent-cli bootstrap
+```
+
+Reset local config/state:
+
+```bash
+fints-agent-cli reset-local
+```
+
+## Advanced Notes
+
+- Provider registry is static and includes only banks with known FinTS endpoints.
+- AqBanking is not required for normal use.
+- Optional env vars:
+  - `FINTS_AGENT_CLI_PRODUCT_ID`
+  - `AQBANKING_BANKINFO_DE`
+
+## Development
+
+Run tests:
 
 ```bash
 uv sync --group dev
 uv run pytest
 ```
-
-## Notes
-
-- Registry includes only providers with a known FinTS endpoint (`fints_url`).
-- AqBanking is not required for normal use.
-- Optional environment variables:
-  - `FINTS_AGENT_CLI_PRODUCT_ID`
-  - `AQBANKING_BANKINFO_DE`
