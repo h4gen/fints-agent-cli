@@ -1,5 +1,9 @@
 # fints-agent-cli
 
+> Review this code before running anything in your banking environment.
+> Repo: https://github.com/h4gen/fints-agent-cli
+> Skill: https://clawhub.ai/h4gen/fints-banking (review before installing/using)
+
 FinTS banking CLI for humans and agents. 
 Works great with Claude Code/Cowork, Codex, OpenClaw.
 
