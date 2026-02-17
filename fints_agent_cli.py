@@ -760,6 +760,8 @@ def cmd_capabilities(args, cfg: Config) -> int:
 
 
 def cmd_bootstrap(args, cfg: Config) -> int:
+    print("Starting bootstrap.")
+    print("This will refresh TAN/SCA setup with your bank.")
     if args.provider:
         provider = resolve_provider(args.provider, load_providers())
         apply_provider_to_config(cfg, provider)
@@ -786,37 +788,49 @@ def cmd_bootstrap(args, cfg: Config) -> int:
     save_state(client.deconstruct(including_private=True))
     cfg.save()
     print("Bootstrap ok.")
+    print("Next step: run `fints-agent-cli accounts`.")
     return 0
 
 
 def cmd_accounts(args, cfg: Config) -> int:
     if not cfg.user_id:
         raise SystemExit("Please run bootstrap first.")
+    print("Fetching accounts and balances...")
     ensure_product_id(cfg, args.product_id)
     pin = get_pin(args, cfg)
     client = build_client(cfg, pin)
+    row_count = 0
     with client:
         ensure_init_ok(client)
         accounts = complete_tan(client, client.get_sepa_accounts())
+        if not accounts:
+            print("No SEPA accounts returned by bank.")
+            return 0
+        print("Output format: <IBAN> <TAB> <Amount> <TAB> <Currency>")
         for acc in accounts:
             bal = complete_tan(client, client.get_balance(acc))
             amount = getattr(bal, "amount", None)
             currency = getattr(amount, "currency", "")
             print(f"{acc.iban}\t{amount}\t{currency}")
+            row_count += 1
     save_state(client.deconstruct(including_private=True))
     cfg.save()
+    print(f"Done. {row_count} account(s) listed.")
+    print("Tip: `fints-agent-cli transactions --iban <IBAN> --days 30`.")
     return 0
 
 
 def cmd_transactions(args, cfg: Config) -> int:
     if not cfg.user_id:
         raise SystemExit("Please run bootstrap first.")
+    print("Fetching transactions...")
     ensure_product_id(cfg, args.product_id)
     pin = get_pin(args, cfg)
     client = build_client(cfg, pin)
 
     from_date = date.today() - timedelta(days=args.days)
     to_date = date.today()
+    print(f"Date window: {from_date.isoformat()} .. {to_date.isoformat()} ({args.days} days)")
     with client:
         ensure_init_ok(client)
         accounts = complete_tan(client, client.get_sepa_accounts())
@@ -830,6 +844,9 @@ def cmd_transactions(args, cfg: Config) -> int:
         if not account:
             # Default: first account
             account = accounts[0]
+            print(f"No --iban provided. Using first account: {account.iban}")
+        else:
+            print(f"Using account: {account.iban}")
         tx = client.get_transactions(account, start_date=from_date, end_date=to_date)
         tx = complete_tan(client, tx)
         rows = []
@@ -870,6 +887,10 @@ def cmd_transactions(args, cfg: Config) -> int:
                 }
             )
         print_transactions(rows, args.format, args.max_purpose)
+        print(f"Done. {len(rows)} transaction(s) returned.")
+        if not rows:
+            print("No transactions in selected range/account.")
+            print("Try `--days 90` or set `--iban <IBAN>` explicitly.")
     save_state(client.deconstruct(including_private=True))
     cfg.save()
     return 0
@@ -911,6 +932,7 @@ def submit_transfer_request(client: FinTS3PinTanClient, cfg: Config, args, amoun
 def cmd_transfer(args, cfg: Config) -> int:
     if not cfg.user_id:
         raise SystemExit("Please run bootstrap first.")
+    print("Starting transfer flow...")
     ensure_product_id(cfg, args.product_id)
     amount = validate_transfer_args(args)
 
@@ -959,6 +981,7 @@ def cmd_transfer(args, cfg: Config) -> int:
                 text = getattr(line, "text", None)
                 if code or text:
                     print(" -", code, text)
+        print("Transfer flow finished.")
     save_state(client.deconstruct(including_private=True))
     cfg.save()
     return 0
@@ -967,6 +990,7 @@ def cmd_transfer(args, cfg: Config) -> int:
 def cmd_transfer_submit(args, cfg: Config) -> int:
     if not cfg.user_id:
         raise SystemExit("Please run bootstrap first.")
+    print("Starting async transfer submission...")
     ensure_product_id(cfg, args.product_id)
     amount = validate_transfer_args(args)
 
@@ -1029,6 +1053,7 @@ def cmd_transfer_submit(args, cfg: Config) -> int:
                 text = getattr(line, "text", None)
                 if code or text:
                     print(" -", code, text)
+        print("Transfer finalized immediately (no pending state created).")
     save_state(client.deconstruct(including_private=True))
     cfg.save()
     return 0
@@ -1037,6 +1062,7 @@ def cmd_transfer_submit(args, cfg: Config) -> int:
 def cmd_transfer_status(args, cfg: Config) -> int:
     if not cfg.user_id:
         raise SystemExit("Please run bootstrap first.")
+    print("Checking async transfer status...")
     ensure_product_id(cfg, args.product_id)
 
     pending_id = args.id
@@ -1092,6 +1118,7 @@ def cmd_transfer_status(args, cfg: Config) -> int:
     save_state(client.deconstruct(including_private=True))
     delete_pending(pending_id)
     cfg.save()
+    print("Pending transfer resolved and removed from local pending store.")
     return 0
 
 
@@ -1243,12 +1270,21 @@ def cmd_reset_local(args, _cfg: Config) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="fints-agent-cli",
-        description="FinTS Banking CLI (accounts, transactions, transfers).",
+        description=(
+            "FinTS Banking CLI for accounts, transactions, and SEPA transfers.\n"
+            "The CLI is designed to guide you step-by-step with explicit outputs and next actions."
+        ),
         epilog=(
-            "Quickstart:\n"
+            "Quickstart (first run):\n"
             "  fints-agent-cli onboard\n"
             "  fints-agent-cli accounts\n"
-            "  fints-agent-cli transactions --days 30\n"
+            "  fints-agent-cli transactions --days 30\n\n"
+            "Transfer (sync):\n"
+            "  fints-agent-cli transfer --from-iban <FROM> --to-iban <TO> --to-name \"Name\" \\\n"
+            "    --amount 12.34 --reason \"Reference\" --yes --auto\n\n"
+            "Transfer (async):\n"
+            "  fints-agent-cli transfer-submit ...\n"
+            "  fints-agent-cli transfer-status --wait\n"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
@@ -1258,7 +1294,16 @@ def main() -> int:
     p_plist = sub.add_parser(
         "providers-list",
         help="List banks",
-        description="List known FinTS banks from the static provider registry.",
+        description=(
+            "List known FinTS banks from the static provider registry.\n"
+            "Use this when you need the provider id/bank code for onboarding."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  fints-agent-cli providers-list --search dkb\n"
+            "  fints-agent-cli providers-list --country DE --limit 50"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p_plist.add_argument("--search", default=None, help="Filter by name/id/bank code, e.g. 'dkb'")
     p_plist.add_argument("--country", default=None, help="Optional country code, e.g. DE")
@@ -1267,14 +1312,28 @@ def main() -> int:
     p_pshow = sub.add_parser(
         "providers-show",
         help="Show bank details",
-        description="Show all stored provider parameters (bank code, URL, etc.).",
+        description=(
+            "Show detailed provider metadata (bank code, FinTS URL, country, support hints).\n"
+            "Use this to validate endpoint data before onboarding."
+        ),
+        epilog="Example:\n  fints-agent-cli providers-show --provider dkb",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p_pshow.add_argument("--provider", required=True, help="Provider ID, bank code, or name")
 
     p_init = sub.add_parser(
         "init",
         help="Set config directly",
-        description="Set configuration values without the interactive wizard.",
+        description=(
+            "Write config directly without interactive prompts.\n"
+            "Useful for scripted provisioning."
+        ),
+        epilog=(
+            "Example:\n"
+            "  fints-agent-cli init --provider dkb --user-id <LOGIN> \\\n"
+            "    --keychain-service fints-agent-cli-pin --keychain-account <LOGIN>"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p_init.add_argument("--provider", default=None, help="Provider ID, bank code, or name")
     p_init.add_argument("--user-id", default=None, help="Bank login name")
@@ -1301,14 +1360,29 @@ def main() -> int:
     p_reset = sub.add_parser(
         "reset-local",
         help="Delete local data",
-        description="Deletes local config/state/pending files under ~/.config/fints-agent-cli.",
+        description=(
+            "Delete local config/state/pending files under ~/.config/fints-agent-cli.\n"
+            "Use this for a clean reset when local state is broken."
+        ),
+        epilog=(
+            "Example:\n"
+            "  fints-agent-cli reset-local -y\n"
+            "After reset, run onboarding again:\n"
+            "  fints-agent-cli onboard"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p_reset.add_argument("-y", "--yes", action="store_true", help="Delete without confirmation")
 
     p_boot = sub.add_parser(
         "bootstrap",
         help="Rerun TAN setup",
-        description="Runs FinTS TAN mechanism setup again.",
+        description=(
+            "Rerun FinTS TAN/SCA setup.\n"
+            "Use this after auth mechanism changes or setup errors."
+        ),
+        epilog="Example:\n  fints-agent-cli bootstrap",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p_boot.add_argument("--user-id", help="Bank login name")
     p_boot.add_argument("--customer-id", default=None, help="Optional, if required by bank")
@@ -1320,7 +1394,19 @@ def main() -> int:
     p_boot.add_argument("--keychain-account", default=None, help="Override keychain account")
     p_boot.add_argument("--no-keychain", action="store_true", help="Do not read PIN from Keychain")
 
-    p_acc = sub.add_parser("accounts", help="Accounts + balances", description="List accounts and current balances.")
+    p_acc = sub.add_parser(
+        "accounts",
+        help="Accounts + balances",
+        description=(
+            "Fetch and print accounts with current balances.\n"
+            "Output: <IBAN> <TAB> <Amount> <TAB> <Currency>."
+        ),
+        epilog=(
+            "Typical next step:\n"
+            "  fints-agent-cli transactions --iban <IBAN> --days 30"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p_acc.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
     p_acc.add_argument("--keychain-service", default=None, help="Override keychain service")
     p_acc.add_argument("--keychain-account", default=None, help="Override keychain account")
@@ -1329,7 +1415,17 @@ def main() -> int:
     p_tx = sub.add_parser(
         "transactions",
         help="Fetch transactions",
-        description="Fetch transactions for one account (or default account).",
+        description=(
+            "Fetch transactions for a selected account.\n"
+            "If --iban is omitted, the first account is used.\n"
+            "Use --format pretty|tsv|json for output control."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  fints-agent-cli transactions --days 30\n"
+            "  fints-agent-cli transactions --iban <IBAN> --days 90 --format json"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p_tx.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
     p_tx.add_argument("--iban", default=None, help="Account IBAN; default account is used if omitted")
@@ -1340,14 +1436,32 @@ def main() -> int:
     p_tx.add_argument("--keychain-account", default=None, help="Override keychain account")
     p_tx.add_argument("--no-keychain", action="store_true", help="Do not read PIN from Keychain")
 
-    p_cap = sub.add_parser("capabilities", help="Live discovery of FinTS operations (BPD/UPD)")
+    p_cap = sub.add_parser(
+        "capabilities",
+        help="Live discovery of FinTS operations (BPD/UPD)",
+        description="Discover operations supported by your bank/account in the active setup.",
+    )
     p_cap.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
     p_cap.add_argument("--iban", default=None, help="Optionally filter to one IBAN")
     p_cap.add_argument("--keychain-service", default=None)
     p_cap.add_argument("--keychain-account", default=None)
     p_cap.add_argument("--no-keychain", action="store_true")
 
-    p_tr = sub.add_parser("transfer", help="Send SEPA transfer", description="Sends a SEPA transfer.")
+    p_tr = sub.add_parser(
+        "transfer",
+        help="Send SEPA transfer",
+        description=(
+            "Send SEPA transfer in one flow.\n"
+            "Use --dry-run for local validation only (no submission)."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  fints-agent-cli transfer --from-iban <FROM> --to-iban <TO> --to-name \"Name\" \\\n"
+            "    --amount 12.34 --reason \"Reference\" --yes --auto\n"
+            "  fints-agent-cli transfer ... --dry-run"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p_tr.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
     p_tr.add_argument("--from-iban", default=None, help="Sender IBAN (recommended with multiple accounts)")
     p_tr.add_argument("--to-iban", required=True, help="Recipient IBAN")
@@ -1371,7 +1485,16 @@ def main() -> int:
     p_tsub = sub.add_parser(
         "transfer-submit",
         help="Start transfer asynchronously",
-        description="Starts order and returns pending ID for later status checks.",
+        description=(
+            "Start transfer asynchronously and return a pending ID.\n"
+            "Then use transfer-status to continue/poll."
+        ),
+        epilog=(
+            "Example:\n"
+            "  fints-agent-cli transfer-submit ...\n"
+            "  fints-agent-cli transfer-status --id <PENDING_ID> --wait"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p_tsub.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
     p_tsub.add_argument("--from-iban", default=None)
@@ -1392,7 +1515,12 @@ def main() -> int:
     p_tstatus = sub.add_parser(
         "transfer-status",
         help="Status of an async transfer",
-        description="Checks/continues a previously started async transfer by pending ID.",
+        description=(
+            "Check/continue an async transfer by pending ID.\n"
+            "With --wait the CLI polls until final or timeout."
+        ),
+        epilog="Example:\n  fints-agent-cli transfer-status --id <PENDING_ID> --wait",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p_tstatus.add_argument("--product-id", default=None, help="Optional; otherwise internal default")
     p_tstatus.add_argument("--id", default=None, help="Pending ID (default: newest)")
@@ -1406,7 +1534,12 @@ def main() -> int:
     p_kc = sub.add_parser(
         "keychain-setup",
         help="Store PIN in Keychain",
-        description="Stores PIN in macOS Keychain for later automatic use.",
+        description=(
+            "Store or update PIN in macOS Keychain.\n"
+            "Commands can then run without re-entering PIN every time."
+        ),
+        epilog="Example:\n  fints-agent-cli keychain-setup --user-id <LOGIN>",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p_kc.add_argument("--user-id", default=None, help="Bank login name")
     p_kc.add_argument("--keychain-service", default=None, help="Keychain service name")
